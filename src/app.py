@@ -62,6 +62,7 @@ from .reranker import get_reranker_model, rerank
 from . import query as query_module
 from . import reranker as reranker_module
 from .gemma_inference import generate_answer, get_gemma_model
+from . import gemma_inference as gemma_module
 
 logger = logging.getLogger("dmrc_rag.api")
 
@@ -141,6 +142,7 @@ class StatusResponse(BaseModel):
     reranker_model: str
     dense_model_loaded: bool
     reranker_model_loaded: bool
+    gemma_model_loaded: bool
     chromadb_connected: bool
 
 
@@ -264,6 +266,7 @@ def system_status() -> StatusResponse:
         reranker_model=reranker_module.MODEL_NAME,
         dense_model_loaded=query_module._model is not None,
         reranker_model_loaded=reranker_module._model is not None,
+        gemma_model_loaded=gemma_module._model is not None,
         chromadb_connected=_check_chromadb_connected(),
     )
 
