@@ -48,10 +48,11 @@ export default function ChatInput({ onSend, disabled }) {
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
           <path
-            d="M4 12L20 4L14 20L11 13L4 12Z"
+            d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"
             stroke="currentColor"
-            strokeWidth="2"
+            strokeWidth="2.2"
             strokeLinejoin="round"
+            strokeLinecap="round"
           />
         </svg>
       </button>

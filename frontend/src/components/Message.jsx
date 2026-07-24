@@ -24,7 +24,9 @@ export default function Message({ role, content, sources, isError, isLoading }) 
 
         {!isUser && sources && sources.length > 0 && (
           <div className="sources-rail">
-            <span className="sources-rail__label">Sourced from</span>
+            <span className="sources-rail__label">
+              Grounded in {sources.length} retrieved {sources.length === 1 ? "clause" : "clauses"}
+            </span>
             <div className="sources-rail__track">
               {sources.map((s, i) => (
                 <SourceChip key={s.chunk_id || i} source={s} />

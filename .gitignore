@@ -5,6 +5,10 @@
 __pycache__/
 *.pyc
 
+# Node.js
+node_modules/
+frontend/node_modules/
+
 # IDE
 .vscode/
 .idea/

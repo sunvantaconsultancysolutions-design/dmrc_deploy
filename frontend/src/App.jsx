@@ -49,10 +49,10 @@ export default function App() {
     <div className="app-shell">
       <header className="app-header">
         <div className="app-header__brand">
-          <span className="app-header__mark">DM</span>
+          <span className="app-header__mark">SV</span>
           <div>
-            <h1>DMRC Contract Intelligence</h1>
-            <p>Grounded Q&amp;A over the ECS / BMS Scope of Work</p>
+            <h1>Sunvanta Consultancy Solutions</h1>
+            <p>Customer Intelligent Chat</p>
           </div>
         </div>
         <StatusBadge />
@@ -61,8 +61,59 @@ export default function App() {
       <main className="chat-scroll" ref={scrollRef}>
         {messages.length === 0 ? (
           <div className="empty-state">
-            <p className="empty-state__eyebrow">Ask about the contract</p>
-            <h2>Query any clause, obligation, or scope item directly.</h2>
+            <p className="empty-state__eyebrow">Contract Intelligence · Government &amp; PSU</p>
+            <h2>
+              Ask your contract.
+              <br />
+              Get the <span className="accent">clause</span>, not a guess.
+            </h2>
+            <p className="empty-state__sub">
+              Query any clause, obligation, or scope item directly. Every answer is grounded
+              in the retrieved contract text, with sources you can verify in seconds.
+            </p>
+
+            <div className="trust">
+              <div className="trust-item">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#1F7A6D" strokeWidth="2.2">
+                  <path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" />
+                </svg>
+                <span>
+                  <b>Grounded answers</b>
+                  <small>Responses are retrieved from the indexed contract text, not guessed.</small>
+                </span>
+              </div>
+              <div className="trust-item">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#1F7A6D" strokeWidth="2.2">
+                  <path d="M9 12l2 2 4-5" />
+                  <circle cx="12" cy="12" r="10" />
+                </svg>
+                <span>
+                  <b>Source-linked</b>
+                  <small>Every answer can surface the clauses it was drawn from.</small>
+                </span>
+              </div>
+              <div className="trust-item">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#1F7A6D" strokeWidth="2.2">
+                  <path d="M4 6h16M4 12h16M4 18h10" />
+                </svg>
+                <span>
+                  <b>Hybrid retrieval</b>
+                  <small>Dense embedding search combined with reranking for relevance.</small>
+                </span>
+              </div>
+              <div className="trust-item">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#1F7A6D" strokeWidth="2.2">
+                  <path d="M12 8v5l3 2" />
+                  <circle cx="12" cy="12" r="10" />
+                </svg>
+                <span>
+                  <b>Verify before relying</b>
+                  <small>Always cross-check answers against the source document.</small>
+                </span>
+              </div>
+            </div>
+
+            <p className="section-label">Try asking</p>
             <div className="suggestion-grid">
               {SUGGESTIONS.map((s) => (
                 <button key={s} onClick={() => handleSend(s)} className="suggestion-card">
@@ -84,8 +135,11 @@ export default function App() {
       <footer className="app-footer">
         <ChatInput onSend={handleSend} disabled={pending} />
         <p className="app-footer__note">
-          Answers are grounded in retrieved contract clauses; verify against the source
-          document before relying on them.
+          Answers are grounded in retrieved contract clauses. <b>Verify against the source
+          document</b> before relying on them.
+        </p>
+        <p className="app-footer__brand">
+          SUNVANTA CONSULTANCY SOLUTIONS · CUSTOMER INTELLIGENT CHAT
         </p>
       </footer>
     </div>
