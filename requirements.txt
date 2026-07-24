@@ -1,13 +1,20 @@
 sentence-transformers==3.0.1
-# BUGFIX: 4.44.2 predates Gemma3ForConditionalGeneration entirely
-# (gemma_inference.py's import fails immediately with it) -- pin to a
-# floor that has it instead of an exact old version.
-transformers>=4.50.0
-# BUGFIX: torch 2.4.1 doesn't ship torch.distributed.tensor.DTensor,
-# which recent transformers/accelerate import at module load time.
-torch>=2.5.0
-torchvision>=0.20.0
-torchaudio>=2.5.0
+# PINNED (was >=4.50.0): exact version from 01_Setup_and_Retrieval_Validation.ipynb's
+# sanity-check cell (`torch/transformers/... version` printout). The "must behave
+# exactly like the notebooks" requirement means this needs to be pinned, not just
+# floored -- an open floor can silently pull a newer transformers release that
+# changes Gemma-2 attention-backend behavior (this file already documents one such
+# prior Gemma-2 garbled-output bug tied to attention-backend/version combinations).
+# Verify this pin still builds/loads cleanly against your target CUDA driver before
+# shipping; re-pin deliberately (and re-validate against the notebooks) if you do.
+transformers==4.57.6
+# PINNED (was >=2.5.0): exact version validated in the same notebook cell.
+torch==2.10.0
+# NOT independently confirmed against the notebook output (only torch/transformers/
+# sentence_transformers/chromadb were printed there) -- verify these two build/import
+# cleanly together with torch==2.10.0 before locking for production; adjust if not.
+torchvision==0.25.0
+torchaudio==2.10.0
 chromadb==0.5.5
 numpy==1.26.4
 tqdm==4.66.5
@@ -16,7 +23,9 @@ fastapi==0.115.0
 uvicorn==0.30.6
 pydantic==2.9.2
 
-accelerate>=1.0.0
+# NOT independently confirmed against the notebook output -- same caveat as
+# torchvision/torchaudio above; verify against transformers==4.57.6 + torch==2.10.0.
+accelerate==1.2.1
 sentencepiece==0.2.2
 
 # BUGFIX: bm25_index.py imports this; it was missing entirely, which is
