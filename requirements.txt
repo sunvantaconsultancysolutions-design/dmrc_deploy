@@ -9,12 +9,14 @@ sentence-transformers==3.0.1
 # shipping; re-pin deliberately (and re-validate against the notebooks) if you do.
 transformers==4.57.6
 # PINNED (was >=2.5.0): exact version validated in the same notebook cell.
+# torchvision/torchaudio removed -- grepped every .py file in src/, main.py,
+# and both notebooks: neither is imported anywhere in the runtime path.
+# gemma_inference.py/reranker.py/query.py only use plain `torch` +
+# `transformers`/`sentence_transformers` (text-only models -- Gemma-2 causal
+# LM, BGE-M3, BGE-reranker -- which don't require torchvision/torchaudio to
+# load or run). Removing them does not change notebook behaviour: they were
+# never exercised by anything the notebooks ran either.
 torch==2.10.0
-# NOT independently confirmed against the notebook output (only torch/transformers/
-# sentence_transformers/chromadb were printed there) -- verify these two build/import
-# cleanly together with torch==2.10.0 before locking for production; adjust if not.
-torchvision==0.25.0
-torchaudio==2.10.0
 chromadb==0.5.5
 numpy==1.26.4
 tqdm==4.66.5
@@ -23,8 +25,9 @@ fastapi==0.115.0
 uvicorn==0.30.6
 pydantic==2.9.2
 
-# NOT independently confirmed against the notebook output -- same caveat as
-# torchvision/torchaudio above; verify against transformers==4.57.6 + torch==2.10.0.
+# NOT independently confirmed against the notebook output (only torch/
+# transformers/sentence_transformers/chromadb were printed there) -- verify
+# this builds/imports cleanly against torch==2.10.0 before shipping.
 accelerate==1.2.1
 sentencepiece==0.2.2
 
