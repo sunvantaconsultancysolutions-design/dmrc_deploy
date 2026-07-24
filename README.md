@@ -147,13 +147,22 @@ React chat UI (frontend/) → deployed on Vercel → calls the GPU host's /ask
 2. RunPod → Pods → Deploy → GPU type A100 40GB/80GB (matches the notebook)
    or an L4 with `GEMMA_USE_4BIT=1` for a cheaper card.
 3. Point the pod at this repo/Dockerfile, expose port `8000` (HTTP),
-   attach a persistent volume at `/models` (`HF_HOME`) so the ~20GB of
-   model weights (BGE-M3 + reranker + Gemma-2-9B) aren't re-downloaded on
-   every restart.
-4. Set `ALLOWED_ORIGINS` to your deployed frontend's URL once you have it
+   attach a persistent volume at `/models` (`HF_HOME`) **from the first
+   deploy** so the ~20GB of model weights (BGE-M3 + reranker + Gemma-2-9B)
+   aren't re-downloaded on every restart.
+4. Set `HF_TOKEN` as a RunPod secret/environment variable. `google/gemma-2-9b-it`
+   is a **gated** checkpoint — the Hugging Face account behind this token
+   must have accepted its license at
+   https://huggingface.co/google/gemma-2-9b-it, or model load fails with a
+   401/gated-repo error. Never commit a real token to the repo.
+5. Set `ALLOWED_ORIGINS` to your deployed frontend's URL once you have it
    (step below).
-5. Confirm `GET /status` returns `chromadb_connected: true` and both
-   model-loaded flags `true` after warm-up.
+6. Expect a slow first boot: with an empty `/models` volume, startup
+   downloads ~2.3GB (BGE-M3) + ~2.3GB (reranker) + ~18GB (Gemma-2-9B bf16)
+   before `/status` responds — 10–20+ minutes is normal, not a hang.
+7. Confirm `GET /status` returns `chromadb_connected: true` and all three
+   `*_model_loaded` flags (`dense_model_loaded`, `reranker_model_loaded`,
+   `gemma_model_loaded`) `true` after warm-up.
 
 For scale-to-zero instead of an always-on Pod, the same Dockerfile is a
 straightforward base for RunPod Serverless — that path additionally needs
