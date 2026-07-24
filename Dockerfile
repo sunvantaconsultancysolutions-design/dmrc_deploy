@@ -49,9 +49,9 @@ COPY chroma_db/ ./chroma_db/
 # Retrieval caps (from 02_Gemma_Inference_and_Serving.ipynb, cell "Runtime
 # caps on retrieval breadth") -- kept as env vars, not notebook magic.
 ENV RAG_MAX_CANDIDATES=20 \
-    RAG_MAX_CONTEXT=4 \
+    RAG_MAX_CONTEXT=8 \
     GEMMA_USE_4BIT=0 \
-    GEMMA_MAX_NEW_TOKENS=320 \
+    GEMMA_MAX_NEW_TOKENS=512 \
     ALLOWED_ORIGINS="*"
 
 EXPOSE 8000

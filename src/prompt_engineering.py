@@ -51,7 +51,10 @@ RESPONSE_INSTRUCTIONS = """Use only the supplied context. Do not assume missing 
 Quote exact values whenever possible (quantities, penalties, durations, thresholds).
 Cite the Clause Number, Page Number, and BOQ Item Number (if available) for every claim.
 Clearly say so if the requested information is unavailable in the context.
-Generate a concise, engineering-style response."""
+Generate a concise, engineering-style response.
+Review every retrieved context block below, not just the first one.
+If more than one block is relevant to the question, combine all relevant clauses into a single, comprehensive answer -- do not stop after the first relevant clause.
+Never use information that is not present in the supplied context, and never hallucinate details not stated there."""
 
 
 ANSWER_SECTION_HEADER = "ANSWER"

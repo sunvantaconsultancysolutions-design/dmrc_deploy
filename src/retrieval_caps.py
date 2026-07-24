@@ -19,7 +19,7 @@ import src.hybrid_retriever as hybrid_retriever
 import src.reranker as reranker
 
 MAX_CANDIDATES = int(os.environ.get("RAG_MAX_CANDIDATES", "20"))  # into reranker
-MAX_CONTEXT = int(os.environ.get("RAG_MAX_CONTEXT", "4"))          # into the LLM
+MAX_CONTEXT = int(os.environ.get("RAG_MAX_CONTEXT", "15"))          # into the LLM
 
 _orig_hybrid = hybrid_retriever.hybrid_search
 _orig_rerank = reranker.rerank

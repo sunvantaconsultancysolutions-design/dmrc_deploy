@@ -103,7 +103,7 @@ MODEL_NAME = "google/gemma-2-9b-it"
 TEMPERATURE = 0.2
 DO_SAMPLE = False
 # Generation is sequential, so latency scales linearly with this.
-MAX_NEW_TOKENS = int(os.environ.get("GEMMA_MAX_NEW_TOKENS", "320"))
+MAX_NEW_TOKENS = int(os.environ.get("GEMMA_MAX_NEW_TOKENS", "512"))
 
 # Load in 4-bit (bitsandbytes) on GPU only if explicitly requested.
 # Falls back to full bfloat16 automatically if bitsandbytes isn't
