@@ -1,0 +1,1303 @@
+{
+  "document_metadata": {
+    "contract": "CE-10 and 11 Lot 4",
+    "schedule": "Schedule S4-1",
+    "document_type": "BOQ_Part_Summaries_and_BOQ_Addendum",
+    "volume": "Vol-3",
+    "source_pdf": "Contract_Agreement_CE-10___CE-11_Lot_4_Vol-3-28-37.pdf",
+    "source_pages_range": "28-37 (10 pages)",
+    "discipline": "Associated Electrical Works",
+    "total_pages_in_schedule_addendum": "42 R",
+    "pages_transcribed": [
+      "PART-H Summary",
+      "PART-I Summary",
+      "PART-J Summary",
+      "REVISED PART-K Summary (Confidential, September 2012)",
+      "PART-K Summary",
+      "PART-L Summary",
+      "1 of 42 R",
+      "2 of 42 R",
+      "3 of 42 R",
+      "4 of 42 R"
+    ],
+    "transcription_convention": {
+      "strikethrough": "Text struck through in source is wrapped in ~~double tildes~~. Replacement value (if any) follows immediately after.",
+      "amendment_flag": "has_amendment: true means the row is struck through / amended in the addendum.",
+      "verbatim_policy": "Spelling errors in source are preserved as-is (e.g., 'QUANITITIES', 'stringest', 'compatability', 'instantanious', 'Stater', 'Marshelling', 'ponts', 'tranducers', 'SARES' for 'SPARES').",
+      "empty_quantity_columns": "Rows with no quantities in source have quantities: null.",
+      "stamp_numbers": "Numeric stamp codes are ink/rubber stamps embedded as images; where a digit sequence could not be reliably read it is marked 'illegible' or given as best-effort partial reading with a note."
+    },
+    "station_columns": [
+      "IGD Airport",
+      "mid shaft",
+      "Palam",
+      "Dashrath Puri",
+      "Dabri Mor",
+      "Janakpuri West"
+    ],
+    "rate_amount_columns": [
+      "Rate in INR",
+      "Rate in Foreign Currency",
+      "Amount in INR",
+      "Amount in Foreign Currency"
+    ]
+  },
+  "pages": [
+    {
+      "page_label": "PART-H Summary",
+      "source_file": "page_001.png",
+      "stamp_number": "top: illegible (approx. 000020); bottom: illegible (approx. 000026)",
+      "stamps_seals": [
+        "Delhi Metro Rail Corporation seal",
+        "ISOLUX INGENIERIA SOCIEDAD ANONIMA seal (partial)",
+        "STERLING AND WILSON LIMITED seal (partial)",
+        "handwritten signatures/initials"
+      ],
+      "items": [
+        {
+          "item_type": "letterhead",
+          "text": "ISOLUX CORSÁN / ISOLUX INGENIERIA, S.A."
+        },
+        {
+          "item_type": "section_title",
+          "text": "LOT 4 : SCHEDULE S4-1"
+        },
+        {
+          "item_type": "title",
+          "text": "PART-H BOQ FOR Additional Misc. Items"
+        },
+        {
+          "item_type": "table",
+          "table_title": "Total brought from above Bills",
+          "columns": [
+            "Section No.",
+            "DESCRIPTION",
+            "INR",
+            "FOREIGN CURRENCY USD"
+          ],
+          "rows": [
+            {
+              "section_no": "PART-H",
+              "description": "BOQ FOR Additional Misc. Items",
+              "inr": "Rs. 3,65,63,350.00",
+              "foreign_currency_usd": "$86,927.00"
+            },
+            {
+              "section_no": "",
+              "description": "TOTAL SUM",
+              "inr": "Rs. 3 65 63 350.00",
+              "foreign_currency_usd": "$86927.00",
+              "item_type": "total_row"
+            }
+          ]
+        },
+        {
+          "item_type": "words_total",
+          "total_sum_words_inr": "Three Crore Sixty Five Lac Sixty Three Thousand Three Hundred Fifty Rupees and No Paise",
+          "total_sum_words_foreign_currency": "Eighty Six Thousand Nine Hundred Twenty Seven Dollars and No Cents"
+        }
+      ]
+    },
+    {
+      "page_label": "PART-I Summary",
+      "source_file": "page_002.png",
+      "stamp_number": "top: illegible (approx. 000021); bottom: 000027",
+      "stamps_seals": [
+        "Delhi Metro Rail Corporation seal",
+        "ISOLUX INGENIERIA SOCIEDAD ANONIMA seal (partial)",
+        "STERLING AND WILSON LIMITED seal (partial)",
+        "handwritten signatures/initials"
+      ],
+      "items": [
+        {
+          "item_type": "letterhead",
+          "text": "ISOLUX CORSÁN / ISOLUX INGENIERIA, S.A."
+        },
+        {
+          "item_type": "section_title",
+          "text": "LOT 4 : SCHEDULE S4-1"
+        },
+        {
+          "item_type": "title",
+          "text": "PART-I BOQ FOR AMC beyond DLP"
+        },
+        {
+          "item_type": "table",
+          "table_title": "Total brought from above Bills",
+          "columns": [
+            "Section No.",
+            "DESCRIPTION",
+            "INR",
+            "FOREIGN CURRENCY USD"
+          ],
+          "rows": [
+            {
+              "section_no": "PART-I",
+              "description": "BOQ FOR AMC beyond DLP",
+              "inr": "Rs. 6,00,43,530.00",
+              "foreign_currency_usd": "$0.00"
+            },
+            {
+              "section_no": "",
+              "description": "TOTAL SUM",
+              "inr": "Rs, 6 00 43 530,00",
+              "foreign_currency_usd": "$0,00",
+              "item_type": "total_row"
+            }
+          ]
+        },
+        {
+          "item_type": "words_total",
+          "total_sum_words_inr": "Six Crore Forty Three Thousand Five Hundred Thirty Rupees and No Paise",
+          "total_sum_words_foreign_currency": "No Dollars and No Cents"
+        }
+      ]
+    },
+    {
+      "page_label": "PART-J Summary",
+      "source_file": "page_003.png",
+      "stamp_number": "top: illegible (approx. 000022); bottom: illegible (approx. 000028)",
+      "stamps_seals": [
+        "Delhi Metro Rail Corporation seal",
+        "ISOLUX INGENIERIA SOCIEDAD ANONIMA seal (partial)",
+        "STERLING AND WILSON LIMITED seal (partial)",
+        "handwritten signatures/initials"
+      ],
+      "items": [
+        {
+          "item_type": "letterhead",
+          "text": "ISOLUX CORSÁN / ISOLUX INGENIERIA, S.A."
+        },
+        {
+          "item_type": "section_title",
+          "text": "LOT 4 : SCHEDULE S4-1"
+        },
+        {
+          "item_type": "title",
+          "text": "PART-J BOQ FOR SARES"
+        },
+        {
+          "item_type": "table",
+          "table_title": "Total brought from above Bills",
+          "columns": [
+            "Section No.",
+            "DESCRIPTION",
+            "INR",
+            "FOREIGN CURRENCY USD"
+          ],
+          "rows": [
+            {
+              "section_no": "PART-J",
+              "description": "BOQ FOR SPARES",
+              "inr": "Rs. 2,38,03,130.00",
+              "foreign_currency_usd": "$3.22,657.00"
+            },
+            {
+              "section_no": "",
+              "description": "TOTAL SUM",
+              "inr": "Rs. 2 38 03 130.00",
+              "foreign_currency_usd": "$322657.00",
+              "item_type": "total_row"
+            }
+          ]
+        },
+        {
+          "item_type": "words_total",
+          "total_sum_words_inr": "Two Crore Thirty Eight Lac Three Thousand One Hundred Thirty Rupees and No Paise",
+          "total_sum_words_foreign_currency": "Three Hundred Twenty Two Thousand Six Hundred Fifty Seven Dollars and No Cents"
+        }
+      ],
+      "notes": [
+        "Section header text as printed reads 'PART- J BOQ FOR SARES' (verbatim OCR/typo for 'SPARES'); the BOQ row description reads 'BOQ FOR SPARES' with section no 'PART -J'."
+      ]
+    },
+    {
+      "page_label": "REVISED PART-K Summary",
+      "source_file": "page_004.png",
+      "stamp_number": "000029",
+      "stamps_seals": [
+        "Delhi Metro Rail Corporation seal"
+      ],
+      "confidential_marking": "Confidential",
+      "date_marking": "September. 2012",
+      "items": [
+        {
+          "item_type": "header",
+          "text": "SCHEDULE S4-1                                 CONTRACT CE-10 and CE-11 LOT-4- Bill of Quantities"
+        },
+        {
+          "item_type": "title",
+          "text": "REVISED PART-K BOQ for Training & Training Manuals"
+        },
+        {
+          "item_type": "table",
+          "table_title": "Total brought from above Bills",
+          "columns": [
+            "Section No.",
+            "DESCRIPTION",
+            "INR",
+            "FOREIGN CURRENCY"
+          ],
+          "rows": [
+            {
+              "section_no": "PART - K",
+              "description": "BOQ FOR TRAINING MANUALS",
+              "inr": "631070",
+              "foreign_currency": "NIL"
+            },
+            {
+              "section_no": "",
+              "description": "TOTAL SUM",
+              "inr": "631070",
+              "foreign_currency": "NIL",
+              "item_type": "total_row"
+            }
+          ]
+        },
+        {
+          "item_type": "words_total",
+          "total_sum_words_inr": "Six Lakh Thirty One Thousand Seventy Only",
+          "total_sum_words_foreign_currency": "NIL"
+        }
+      ]
+    },
+    {
+      "page_label": "PART-K Summary",
+      "source_file": "page_005.png",
+      "stamp_number": "top: illegible (approx. 000023); bottom: illegible (approx. 000030)",
+      "stamps_seals": [
+        "Delhi Metro Rail Corporation seal",
+        "ISOLUX INGENIERIA SOCIEDAD ANONIMA seal (partial)",
+        "STERLING AND WILSON LIMITED seal (partial)",
+        "handwritten signatures/initials"
+      ],
+      "items": [
+        {
+          "item_type": "letterhead",
+          "text": "ISOLUX CORSÁN / ISOLUX INGENIERIA, S.A."
+        },
+        {
+          "item_type": "section_title",
+          "text": "LOT 4 : SCHEDULE S4-1"
+        },
+        {
+          "item_type": "title",
+          "text": "PART - K BOQ for Training & Training Manuals"
+        },
+        {
+          "item_type": "table",
+          "table_title": "Total brought from above Bills",
+          "columns": [
+            "Section No.",
+            "DESCRIPTION",
+            "INR",
+            "FOREIGN CURRENCY USD"
+          ],
+          "rows": [
+            {
+              "section_no": "PART - K",
+              "description": "BOQ FOR TRAINING MANUALS",
+              "inr": "Rs. 6,30,490.00",
+              "foreign_currency_usd": "$0.00"
+            },
+            {
+              "section_no": "",
+              "description": "TOTAL SUM",
+              "inr": "Rs. 6 30 490.00",
+              "foreign_currency_usd": "$0.00",
+              "item_type": "total_row"
+            }
+          ]
+        },
+        {
+          "item_type": "words_total",
+          "total_sum_words_inr": "Six Lac Thirty Thousand Four Hundred Ninety Rupees and No Paise",
+          "total_sum_words_foreign_currency": "No Dollars and No Cents"
+        }
+      ]
+    },
+    {
+      "page_label": "PART-L Summary",
+      "source_file": "page_006.png",
+      "stamp_number": "top: illegible (approx. 000024); bottom: illegible (approx. 000031)",
+      "stamps_seals": [
+        "Delhi Metro Rail Corporation seal",
+        "ISOLUX INGENIERIA SOCIEDAD ANONIMA seal (partial)",
+        "STERLING AND WILSON LIMITED seal (partial)",
+        "handwritten signatures/initials"
+      ],
+      "items": [
+        {
+          "item_type": "letterhead",
+          "text": "ISOLUX CORSÁN / ISOLUX INGENIERIA, S.A."
+        },
+        {
+          "item_type": "section_title",
+          "text": "LOT 4 : SCHEDULE S4-1"
+        },
+        {
+          "item_type": "title",
+          "text": "PART -L BOQ for Operation and Maintenance Manuals"
+        },
+        {
+          "item_type": "table",
+          "table_title": "Total brought from above Bills",
+          "columns": [
+            "Section No.",
+            "DESCRIPTION",
+            "INR",
+            "FOREIGN CURRENCY USD"
+          ],
+          "rows": [
+            {
+              "section_no": "PART -L",
+              "description": "BOQ for Operation and Maintenance manuals",
+              "inr": "Rs. 5,04,390.00",
+              "foreign_currency_usd": "$0.00"
+            },
+            {
+              "section_no": "",
+              "description": "TOTAL SUM",
+              "inr": "Rs. 5 04 390.00",
+              "foreign_currency_usd": "$0.00",
+              "item_type": "total_row"
+            }
+          ]
+        },
+        {
+          "item_type": "words_total",
+          "total_sum_words_inr": "Five Lac Four Thousand Three Hundred Ninety Rupees and No Paise",
+          "total_sum_words_foreign_currency": "No Dollars and No Cents"
+        }
+      ]
+    },
+    {
+      "page_label": "1 of 42 R",
+      "source_file": "page_007.png",
+      "stamp_number": "not legible in text layer (image-based)",
+      "stamps_seals": [
+        "handwritten signatures/initials (partial, image-based, not clearly legible)"
+      ],
+      "header": "Contract CF- 10 and 11 I of 4    Schedule S4-1    Associated Electrical Works",
+      "schedule_title": "SCHEDULE OF QUANITITIES FOR PART-A Electrical WORKS - CE-10&11 LOT-4(ADDENDUM)",
+      "items": [
+        {
+          "s_no": "1",
+          "item_type": "section_header",
+          "description": "Switch Boards/panels",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": null,
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "Supply, installation, testing and commissioning of front operated, front / back access, cubicle type, indoor duty, floor / wall / recess / surface mounted (as specified), totally enclosed dust and vermin proof switchboards / panels with minimum Ingress protection classification of IP 54, fabricated from 2 mm thick CRCA sheets with dip coat priming and epoxy powder coated finish. The panels must be suitable for 415 volts 3 phase, 4 wire, 50 Hz, system , must be able to withstand symmetrical fault level of 65 or 50 KA (as specified for various panels) for 1 sec at 415 V and must include all interconnections, earthing and bonding requirements etc. The panels must conform to drawings & standards specified in relevant specifications, as required and as given below.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "a",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "Main LV Switchboards must conform to ~~Section E01 of the M & W~~ specifications",
+          "has_amendment": true,
+          "amendments": [
+            {
+              "struck_text": "Section E01 of the M & W",
+              "replacement_text": null
+            }
+          ],
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "b",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "All Sub - Main LV Switchboards must conform to ~~Section E05 of the M & W~~ specifications",
+          "has_amendment": true,
+          "amendments": [
+            {
+              "struck_text": "Section E05 of the M & W",
+              "replacement_text": null
+            }
+          ],
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "c",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "All Local Electrical Panels must conform to ~~Section E06 of the M & W~~ specifications",
+          "has_amendment": true,
+          "amendments": [
+            {
+              "struck_text": "Section E06 of the M & W",
+              "replacement_text": null
+            }
+          ],
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "d",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "All the items mentioned in relevant Sections / Clauses of the ~~M & W~~ specifications and not specifically mentioned in BOQ shall be deemed to be included in the quoted rates",
+          "has_amendment": true,
+          "amendments": [
+            {
+              "struck_text": "M & W",
+              "replacement_text": null
+            }
+          ],
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "e",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "In case of any contradiction between BOQ / ~~M & W~~ Specifications and Drawings, the most stringest conditions of the above will apply.",
+          "has_amendment": true,
+          "amendments": [
+            {
+              "struck_text": "M & W",
+              "replacement_text": null
+            }
+          ],
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "f",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "The Switchboards shall be provided with detachable gland plates for entry of cables from the top / bottom as required.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "g",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "All live accessible parts shall be shrouded and all equipment shall be finger touch proof. SMC / DMC shrouds and busbar supports suitably spaced shall be used. Hinged doors with padlocking facility shall be provided on all outgoing feeders with switch handles lockable in OFF position.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "h",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "The panel shall have copper busbars as specified in ~~Section E01 of M & W~~ Specifications with bar type feeder connections, spacers etc. with full sized neutral.",
+          "has_amendment": true,
+          "amendments": [
+            {
+              "struck_text": "Section E01 of M & W",
+              "replacement_text": null
+            }
+          ],
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "i",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "Earthing all components, frames etc. to a common internal earth bar of size 50 x 6 mm Cu . or higher, as required by the fault withstand level specified for the board.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "j",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "All accessories & supporting structures such as channels, ISMC-100 base frame, mounting brackets, lifting lugs, panel heaters, ventilation arrangement etc shall be provided as required.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "k",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "Each incomer and outgoing feeder shall be provided with LED type status indication lamps suitable for 240 V, AC, as approved.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        }
+      ]
+    },
+    {
+      "page_label": "2 of 42 R",
+      "source_file": "page_008.png",
+      "stamp_number": "not legible in text layer (image-based)",
+      "stamps_seals": [
+        "handwritten signatures/initials (partial, image-based, not clearly legible)"
+      ],
+      "header": "Contract CF- 10 and 11 I of 4    Schedule S4-1    Associated Electrical Works",
+      "schedule_title": "SCHEDULE OF QUANITITIES FOR PART-A Electrical WORKS - CE-10&11 LOT-4(ADDENDUM)",
+      "items": [
+        {
+          "s_no": "l",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "Space provision as specified in ~~M & W~~ Specifications for future expansion.",
+          "has_amendment": true,
+          "amendments": [
+            {
+              "struck_text": "M & W",
+              "replacement_text": null
+            }
+          ],
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "m",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "The make of all switchgear (ACB / MCCB / MCB etc.) must be same to have total discrimination.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "n",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "Components and accessories shall be same for switchboards and panels for uniformity, standardisation and replaceability and shall be applicable to all panels/ boards under the scope of work",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "o",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "All interconnections, labeling, earthing, associated foundation / masonary work, sealing of gaps around the panels by chequered plates & erection etc. complete shall be executed as required.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "p",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "MCCB's shall be as per ~~Section E01, E05 and E06 of M & W~~ Specifications and shall be current limiting type with front adjustable electronic releases for required protections against fault, suitable for isolation as per Annexure 7.1.2 of IEC 60947 – 2, with Ics and Icu values as specified in relevant clauses of M & W Specifications and conforming to latest IEC 60947. The operating operating voltage (Ue) shall be 415 V and insulation voltage (Ui) 690V with trip free mechanism, handle indicating ON / OFF / tripped positions. The breaking capacity as mentioned in items of BOQ below, shall be Ics values and shall not be less then 56kA. Breakers must have Ics = 100% Icu. Electronic trip units shall comply with the requirements as specified in Appendix F (EMC /EMI Compatibility) of IEC 60947-2 or EN 60947-2.",
+          "has_amendment": true,
+          "amendments": [
+            {
+              "struck_text": "Section E01, E05 and E06 of M & W",
+              "replacement_text": null
+            }
+          ],
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "q",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "MCCBs for Network / Feeder Protection shall have adjustable protection against Overload and adjustable protection against Short Circuit as specified in ~~Section E01 and E05 of M & W~~ Specifications, whether specifically asked in BOQ or not. MCCB's for Network / Feeder Protection shall have releases with Earth Fault protection feature, wherever and as indicated in Bill of Quantities or Drawings. However, on completion of Cable Sizing Calculations and Fault calculations by the Contractor, if Earth Fault releases are required for additional feeders, where this requirement is not indicated in the BOQ, same shall be provided at no extra cost to the Employer. For Motor Protection MCCB's, requirements of ~~Section E06 of M & W~~ Specifications shall be followed.",
+          "has_amendment": true,
+          "amendments": [
+            {
+              "struck_text": "Section E01 and E05 of M & W",
+              "replacement_text": null
+            },
+            {
+              "struck_text": "Section E06 of M & W",
+              "replacement_text": null
+            }
+          ],
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "r",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "ACBs/MCCBs shall be compact, suitably designed to provide protection of motors, cables, busbars to suit rated current, unbalanced power distribution, as required.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "s",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "Panel / Switchboard board design shall be compact and components / accessories of compact sizes shall be used to economise the room space available. Employer reserve the right to seek compact items inplace of larger ones.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "t",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "Incomer ACB'S / MCCBs / MCBs of switchboards / panels shall be provided with NO / NC contacts as specified in specifications for interface with SCADA System and for manual / auto and local / remote operation.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        }
+      ]
+    },
+    {
+      "page_label": "3 of 42 R",
+      "source_file": "page_009.png",
+      "stamp_number": "not legible in text layer (image-based)",
+      "stamps_seals": [
+        "handwritten signatures/initials (partial, image-based, not clearly legible)"
+      ],
+      "header": "Contract CF-10 and 11 Lot 4    Schedule S4-1    Associated Electrical Works",
+      "schedule_title": "SCHEDULE OF QUANITITIES FOR PART-A Electrical WORKS - CE-10&11 LOT-4(ADDENDUM)",
+      "items": [
+        {
+          "s_no": "u",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "ACB's shall have Microprocessor based releases as specified in the ~~M & W~~ Specifications.",
+          "has_amendment": true,
+          "amendments": [
+            {
+              "struck_text": "M & W",
+              "replacement_text": null
+            }
+          ],
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "v",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "In case higher frame sizes (than those specified in the BOQ) are required to be provided to achieve the requirement of Total Discrimination mentioned in ~~Section E01 and E05 of M & W~~ Specifications, due to selection of a particular make, the same shall be provided at no extra cost if other makes are able to achieve the same with the specified frame size.",
+          "has_amendment": true,
+          "amendments": [
+            {
+              "struck_text": "Section E01 and E05 of M & W",
+              "replacement_text": null
+            }
+          ],
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "w",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "Contractor must carry out Cable Sizing based on actual lengths of cables and Discrimination study for selection of trip units and settings for the releases during production of Working Drawings.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "x",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "All Motor feeders, having separate Thermal Over - load relay, shall be provided with Reset push button.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "y",
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "Even though, ratings of MPCB / Contactors for Motor Feeders are mentioned in BOQ items below, after Selection of a particular make of Switchgear, MPCB / Contactors with ratings as per tested Type II Coordination from the selected manufacturer, only shall be provided.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": null,
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "Description of Various panels/boards covered under this BOQ is",
+          "transcription_note": "Partial/duplicated line in source, immediately followed by the full line below.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": null,
+          "item_type": "general_note",
+          "parent": "1",
+          "description": "Description of Various panels/boards covered under this BOQ is as given below:",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "1.01",
+          "item_type": "boq_item_header",
+          "description": "(Type-1 for chiller plant with 3 chillers )",
+          "panel_reference": "MAIN PLANT PANEL DB-170/270 ( Type-1)",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": null,
+          "item_type": "boq_item",
+          "parent": "1.01",
+          "description": "Panel complete as per specifications, drawings, requirements & following details:",
+          "has_amendment": false,
+          "unit": "Sets",
+          "quantities": {
+            "IGD Airport": 0,
+            "mid shaft": 0,
+            "Palam": 1,
+            "Dashrath Puri": 1,
+            "Dabri Mor": 1,
+            "Janakpuri West": 0,
+            "Total Quantity": 3
+          },
+          "rate_in_inr": 8810960,
+          "rate_in_foreign_currency": null,
+          "amount_in_inr": 26432880,
+          "amount_in_foreign_currency": null
+        },
+        {
+          "s_no": "A",
+          "item_type": "sub_section_header",
+          "parent": "1.01",
+          "description": "INCOMERS",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "1)",
+          "item_type": "sub_item",
+          "parent": "1.01.A",
+          "description": "2 Nos. 2500A, 415 V, ~~65~~ 50KA, 50 Hz TPN EDO type ACBs interlocked with buscoupler and complete with microprocessor based releases having SCADA compatability and energy metering.",
+          "has_amendment": true,
+          "amendments": [
+            {
+              "struck_text": "65",
+              "replacement_text": "50"
+            }
+          ],
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "2)",
+          "item_type": "sub_item",
+          "parent": "1.01.A",
+          "description": "2 sets of Red (on), Green (off) and amber (C.B. Fault) indicating lamps",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "3)",
+          "item_type": "sub_item",
+          "parent": "1.01.A",
+          "description": "2 sets of (three) white phase indicating lamps",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "4)",
+          "item_type": "sub_item",
+          "parent": "1.01.A",
+          "description": "Metering",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "i)",
+          "item_type": "sub_item",
+          "parent": "1.01.A.4",
+          "description": "2 Nos. Multifunction energy meter for measurement of voltage, line current, power factor, power & energy.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "ii)",
+          "item_type": "sub_item",
+          "parent": "1.01.A.4",
+          "description": "3 Nos. CTs 2500/5A, 15VA, CL-1 for metering.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "5)",
+          "item_type": "sub_item",
+          "parent": "1.01.A",
+          "description": "Terminals to receive XLPE armoured power & control cables",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "B",
+          "item_type": "sub_section_header",
+          "parent": "1.01",
+          "description": "BUSBAR",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": null,
+          "item_type": "sub_item",
+          "parent": "1.01.B",
+          "description": "2 Nos. Electrolytic high conductivity tinned copper three phase and neutral busbars rated at 2500 A having a maximum current density of 1.2 A per sqmm suitable to withstand symmetrical fault level of ~~56~~ 50KA at 415 V .",
+          "has_amendment": true,
+          "amendments": [
+            {
+              "struck_text": "56",
+              "replacement_text": "50"
+            }
+          ],
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "C",
+          "item_type": "sub_section_header",
+          "parent": "1.01",
+          "description": "BUS COUPLER",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "1)",
+          "item_type": "sub_item",
+          "parent": "1.01.C",
+          "description": "1 Nos. 2500A, 415 V, ~~65~~ 50KA, 50 Hz TPN EDO type ACBs interlocked with buscoupler and complete with microprocessor based releases having SCADA compatability",
+          "has_amendment": true,
+          "amendments": [
+            {
+              "struck_text": "65",
+              "replacement_text": "50"
+            }
+          ],
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "2)",
+          "item_type": "sub_item",
+          "parent": "1.01.C",
+          "description": "Terminals to receive XLPE armoured power & control cables",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "3)",
+          "item_type": "sub_item",
+          "parent": "1.01.C",
+          "description": "Digital Ammeter with Inbuilt Selector Switch",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "4)",
+          "item_type": "sub_item",
+          "parent": "1.01.C",
+          "description": "3 Nos. CTs, 2500/5A, 15VA, CL-1 for metering.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "D",
+          "item_type": "sub_section_header",
+          "parent": "1.01",
+          "description": "OUT GOING FEEDERS",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "1",
+          "item_type": "sub_item",
+          "parent": "1.01.D",
+          "description": "3 Sets feeder for Chiller Motors up to 276 KW each shall be equipped with the followings but not limited to:",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        }
+      ]
+    },
+    {
+      "page_label": "4 of 42 R",
+      "source_file": "page_010.png",
+      "stamp_number": "not legible in text layer (image-based)",
+      "stamps_seals": [
+        "handwritten signatures/initials (partial, image-based, not clearly legible)"
+      ],
+      "header": "Contract CF-10 and 11 Lot 4    Schedule S4-1    Associated Electrical Works",
+      "schedule_title": "SCHEDULE OF QUANITITIES FOR PART-A Electrical WORKS - CE-10&11 LOT-4(ADDENDUM)",
+      "items": [
+        {
+          "s_no": "a)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.1",
+          "description": "1 No. 800 A, 415V, ~~65~~ 50kA, 3 Pole, Electrically operated Draw Out type, ACB complete with safety shutters, 240V AC or 110V DC (control supply voltage to be selected in consultation with BMS Contractor) shunt trip coil & Closing coil and having microprocessor based releases with (1) Protection against long time + short time + instantanious + earth fault (all with adjustable time delays) (2) NO / NC contacts for interlocks and indications (3) 1 no CT in neutral to connect with the trip unit.",
+          "has_amendment": true,
+          "amendments": [
+            {
+              "struck_text": "65",
+              "replacement_text": "50"
+            }
+          ],
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "b)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.1",
+          "description": "TNC switch",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "c)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.1",
+          "description": "Selector switch for auto/manual operation.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "d)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.1",
+          "description": "LED indication lamp for ON, OFF & TRIP.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "e)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.1",
+          "description": "Digital Ammeter with Inbuild Selector Switch",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "f)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.1",
+          "description": "3 Nos. CTs 800/5A, 15VA, CL-1 for metering.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "g)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.1",
+          "description": "Digital Energy meter.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "h)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.1",
+          "description": "Power & control terminals for cable connections.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "2",
+          "item_type": "sub_item",
+          "parent": "1.01.D",
+          "description": "4 Sets of Star - Delta Starter Unit for Primary Chilled Water Pump Motors of ~~12~~ 15KW (3 Working + 1 Standby) and each shall be equipped with the followings but not limited to:(For -CHWP-001P, CHWP-002P, CHWP-003P, CHWP-04P)",
+          "has_amendment": true,
+          "amendments": [
+            {
+              "struck_text": "12",
+              "replacement_text": "15"
+            }
+          ],
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "a)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.2",
+          "description": "1 No. 3 Pole 100A, 50kA at 415V, 3P motor duty MCCB with Electronic Trip Unit.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "b)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.2",
+          "description": "1 No. Digital Ammeter, CT operated.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "c)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.2",
+          "description": "1 No. CT 100/5A, 15VA, class - I for metering.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "d)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.2",
+          "description": "Local / Remote Selector Switch key operated.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "e)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.2",
+          "description": "Working / Standby Selector Switch key operated.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "f)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.2",
+          "description": "Door mounted push buttons for Start and Stop functions.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "g)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.2",
+          "description": "Emergency stop push button lockable type.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "h)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.2",
+          "description": "LED indication lamp for ON, OFF, Trip.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "i)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.2",
+          "description": "3 Nos suitable rating AC-3 duty, 3 Pole Contactor with Auxiliary",
+          "transcription_note": "Row text appears truncated at cell edge in source.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "j)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.2",
+          "description": "One no star-delta timer.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "k)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.2",
+          "description": "1 No. Auxiliary Contactor with 4 Nos. Auxiliary Contacts for Remote",
+          "transcription_note": "Row text appears truncated at cell edge in source.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "l)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.2",
+          "description": "1 No Single Phasing Preventor Relay.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "m)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.2",
+          "description": "Power & control terminals for cable connections.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "n)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.2",
+          "description": "Digital Energy meter.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "o)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.2",
+          "description": "Provision for terminals for wiring to Local control panel (LCP)",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "3",
+          "item_type": "sub_item",
+          "parent": "1.01.D",
+          "description": "3 Nos. Feeder for Secondary Chilled Water Pump Motors of 37 KW (2 Working + 1 Standby) and each shall be equipped with the followings but not limited to:(For CHWP-001S, CHWP-002S, CHWP-003S)",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "a)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.3",
+          "description": "1 No. 3 Pole 100A, 50kA at 415V, 3P motor duty MCCB with Electronic",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "b)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.3",
+          "description": "1 No. Digital Ammeter, CT operated.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "c)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.3",
+          "description": "1 No. CT 100/5A, 15VA, class - I for metering.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "d)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.3",
+          "description": "LED indication lamp for ON, OFF, Trip.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "e)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.3",
+          "description": "Digital Energy meter.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "4)",
+          "item_type": "sub_item",
+          "parent": "1.01.D",
+          "description": "4 Sets of Star - Delta Stater unit for Condenser Water Pump Motors up to 37 KW ( 3 Working + 1 Standby ) and each shall be equipped with the followings but not limited to:(For CDWP-001, CDWP-002, CDWP-003, CDWP-04)",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "a)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.4",
+          "description": "1 No. 3 Pole 100A, 50kA at 415V, 3P motor duty MCCB with Electronic",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "b)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.4",
+          "description": "1 No. Digital Ammeter, CT operated.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "c)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.4",
+          "description": "1 No. CT 100/5A, 15VA, class - I for metering.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "d)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.4",
+          "description": "Local / Remote Selector Switch key operated.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "e)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.4",
+          "description": "Working / Standby Selector Switch key operated.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null
+        },
+        {
+          "s_no": "f)",
+          "item_type": "sub_item",
+          "parent": "1.01.D.4",
+          "description": "Door mounted push buttons for Start and Stop functions.",
+          "has_amendment": false,
+          "unit": null,
+          "quantities": null,
+          "transcription_note": "Table/page cuts off here; item 4 continues on the following page (outside this 10-page chunk)."
+        }
+      ]
+    }
+  ]
+}

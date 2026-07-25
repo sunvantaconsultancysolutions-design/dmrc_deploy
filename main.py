@@ -20,7 +20,7 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 
 from metadata_loader import build_chunk_records
-from text_normalization import build_embedding_input
+from text_normalization import build_embedding_input, build_boq_embedding_input
 from batch_embed import embed_batch
 from storage import store_chunks
 
@@ -41,6 +41,29 @@ def _load_records(filepath: str, carry_over_record=None):
     return filename, records, open_record
 
 
+# chunk_type values eligible for embedding. "clause" (Chapter text) and
+# "boq" (Bill-of-Quantities items) both carry real embeddable content;
+# cover_page/index/marginalia/stamp remain excluded per the Chapter 7
+# Chunking Strategy.
+EMBEDDABLE_CHUNK_TYPES = {"clause", "boq"}
+
+
+def _build_embedding_text(record):
+    """Routes embedding-text construction by chunk_type so the existing
+    Chapter (clause) pipeline is untouched while BOQ chunks get their
+    own appropriately-shaped input built from BOQ metadata.
+    """
+    if record.metadata["chunk_type"] == "boq":
+        return build_boq_embedding_input(record.metadata, record.text)
+
+    return build_embedding_input(
+        record.metadata["clause_no"],
+        record.metadata["heading"],
+        record.metadata["section_heading"],
+        record.text,
+    )
+
+
 def _embed_and_store(filename: str, records: list):
     """Embed and persist the chunks already finalized for one file.
 
@@ -49,30 +72,25 @@ def _embed_and_store(filename: str, records: list):
     append to it (embedding a chunk, then mutating its text via a
     cross-file merge, would leave the stored vector stale).
 
-    Only chunk_type == "clause" is eligible for embedding. Continuation
-    fragments no longer exist as their own chunk_type -- they were
-    merged into their parent clause by build_chunk_records -- and
-    cover_page/index/marginalia/stamp entries are intentionally excluded
-    per the Chapter 7 Chunking Strategy.
+    chunk_type in EMBEDDABLE_CHUNK_TYPES ("clause" and "boq") is eligible
+    for embedding. Continuation fragments no longer exist as their own
+    chunk_type -- they were merged into their parent clause by
+    build_chunk_records -- and cover_page/index/marginalia/stamp entries
+    are intentionally excluded per the Chapter 7 Chunking Strategy.
     """
-    embeddable = [r for r in records if r.metadata["chunk_type"] == "clause"]
+    embeddable = [r for r in records if r.metadata["chunk_type"] in EMBEDDABLE_CHUNK_TYPES]
+    n_clause = sum(1 for r in embeddable if r.metadata["chunk_type"] == "clause")
+    n_boq = sum(1 for r in embeddable if r.metadata["chunk_type"] == "boq")
 
     print(f"[{filename}] {len(records)} chunks parsed, "
           f"{len(embeddable)} eligible for embedding "
-          f"({len(records) - len(embeddable)} filtered: cover/index/marginalia).")
+          f"({n_clause} clause, {n_boq} boq; "
+          f"{len(records) - len(embeddable)} filtered: cover/index/marginalia/stamp).")
 
     if not embeddable:
         return 0
 
-    texts_for_embedding = [
-        build_embedding_input(
-            r.metadata["clause_no"],
-            r.metadata["heading"],
-            r.metadata["section_heading"],
-            r.text,
-        )
-        for r in embeddable
-    ]
+    texts_for_embedding = [_build_embedding_text(r) for r in embeddable]
 
     vectors = embed_batch(texts_for_embedding, batch_size=32)
 
@@ -133,7 +151,7 @@ def main():
     if args.input_dir:
         total += process_directory(args.input_dir)
 
-    print(f"\nDone. {total} clause embeddings written to ./chroma_db")
+    print(f"\nDone. {total} clause/boq embeddings written to ./chroma_db")
 
 
 if __name__ == "__main__":

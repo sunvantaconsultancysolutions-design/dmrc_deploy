@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Optional
 # ---------------------------------------------------------------------------
 
 SYSTEM_PROMPT = """You are an Engineering Contract Assistant for the DMRC BE-12 LOT3 & BE-14 LOT3 project.
+You answer using both contract clauses and Bill of Quantities (BOQ) items.
 
 Answer ONLY using the supplied context below.
 Never invent information that is not present in the context.
@@ -127,6 +128,52 @@ def _format_document_name(metadata: Dict[str, Any]) -> Optional[str]:
     return stem.title() if stem else document_name
 
 
+def _format_boq_block(index: int, candidate: Dict[str, Any]) -> str:
+    """Renders a single retrieved BOQ chunk as a "Rank N" block, using
+    BOQ-specific metadata (item number, section, parent item, item
+    type, schedule, contract, page) instead of the clause fields
+    format_context() uses. Kept as a separate function so clause
+    formatting in format_context() is untouched.
+    """
+    metadata = candidate["metadata"]
+
+    lines = [f"Rank {index}"]
+
+    s_no = metadata.get("s_no")
+    lines.append(f"BOQ Item {s_no}" if s_no else "BOQ Item (number unavailable)")
+
+    detail_fields = [
+        ("Section", metadata.get("section")),
+        ("Parent", metadata.get("parent")),
+        ("Item Type", metadata.get("item_type")),
+        ("Schedule", metadata.get("schedule")),
+        ("Contract", metadata.get("contract")),
+    ]
+    for label, value in detail_fields:
+        if value:
+            lines.append(f"{label}: {value}")
+
+    chunk_text = candidate["document"].strip()
+    chunk_text = re.sub(r"\n\s*\n+", "\n\n", chunk_text)
+    lines.append("")
+    lines.append(chunk_text)
+
+    footer_parts = []
+    page_number = metadata.get("pdf_page")
+    if page_number in (None, ""):
+        page_number = metadata.get("page_number")
+    if page_number not in (None, ""):
+        footer_parts.append(f"Page {page_number}")
+    document_name = _format_document_name(metadata)
+    if document_name:
+        footer_parts.append(f"Source Document: {document_name}")
+    if footer_parts:
+        lines.append("")
+        lines.append(" | ".join(footer_parts))
+
+    return "\n".join(lines)
+
+
 def format_context(candidates: List[Dict[str, Any]]) -> str:
     """Renders the retrieved candidates as numbered "Rank N" blocks
     (11.6) -- these are reranked results (BGE Reranker), so "Rank"
@@ -137,9 +184,14 @@ def format_context(candidates: List[Dict[str, Any]]) -> str:
     Number, BOQ Item Number, Source Document.
 
     BOQ Item Number is only shown when metadata actually carries an
-    item_number field -- this pipeline currently only indexes contract
-    clauses (no BOQ parser exists yet), so this stays conditional rather
-    than printing an empty "BOQ Item: N/A" on every single result.
+    item_number field, so this stays conditional rather than printing
+    an empty "BOQ Item: N/A" on every single result.
+
+    Candidates whose metadata["chunk_type"] == "boq" are instead routed
+    to _format_boq_block(), which formats them using BOQ-specific
+    fields (item number, section, parent item, item type, schedule,
+    contract, page) rather than the clause fields below. Clause
+    formatting itself is unchanged.
     """
     if not candidates:
         return ""
@@ -147,6 +199,10 @@ def format_context(candidates: List[Dict[str, Any]]) -> str:
     blocks = []
     for i, candidate in enumerate(candidates, start=1):
         metadata = candidate["metadata"]
+
+        if metadata.get("chunk_type") == "boq":
+            blocks.append(_format_boq_block(i, candidate))
+            continue
 
         header_parts = []
         clause_no = metadata.get("clause_no")

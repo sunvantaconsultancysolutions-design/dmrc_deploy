@@ -68,3 +68,57 @@ def build_embedding_input(clause_no: str, heading: str,
     if prefix:
         return f"{prefix}\n{normalized_text}"
     return normalized_text
+
+
+def build_boq_embedding_input(metadata: dict, text: str) -> str:
+    """Constructs the exact string sent to the embedding model for a
+    BOQ (Bill of Quantities) chunk.
+
+    Mirrors build_embedding_input()'s approach -- lightly prepend
+    semantic/structural context ahead of the normalized chunk text --
+    but draws on the BOQ metadata fields instead of clause_no/heading/
+    section_heading. Only fields with genuine retrieval value are
+    included (contract, schedule, discipline, section, item type, item
+    number, parent); identifiers and pipeline bookkeeping fields such as
+    chunk_id, chunk_hash, sequence numbers, approval_status, language,
+    stamps, and page labels are deliberately never concatenated in, to
+    keep the embedded text concise and free of retrieval-irrelevant
+    noise.
+    """
+    metadata = metadata or {}
+    prefix_lines = []
+
+    contract = metadata.get("contract")
+    if contract:
+        prefix_lines.append(f"Contract {contract}")
+
+    schedule = metadata.get("schedule")
+    if schedule:
+        prefix_lines.append(f"Schedule {schedule}")
+
+    discipline = metadata.get("discipline")
+    if discipline:
+        prefix_lines.append(f"Discipline {discipline}")
+
+    section = metadata.get("section")
+    if section:
+        prefix_lines.append(f"Section {section}")
+
+    item_type = metadata.get("item_type")
+    if item_type:
+        prefix_lines.append(f"Item Type {item_type}")
+
+    s_no = metadata.get("s_no")
+    if s_no:
+        prefix_lines.append(f"BOQ Item {s_no}")
+
+    parent = metadata.get("parent")
+    if parent:
+        prefix_lines.append(f"Parent {parent}")
+
+    prefix = "\n".join(prefix_lines)
+    normalized_text = normalize_text(text)
+
+    if prefix:
+        return f"{prefix}\n{normalized_text}"
+    return normalized_text
