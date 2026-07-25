@@ -57,6 +57,7 @@ a drop-in replacement for Chapter 9's output when handed to Chapter
 
 import argparse
 import os
+import statistics
 from typing import Any, Dict, List, Optional
 
 import torch
@@ -204,6 +205,80 @@ def rerank(
             print(f"  {c['chunk_id']}  clause={clause_no}  reranker_score={c['reranker_score']}")
 
     return reranked
+
+
+# ---------------------------------------------------------------------------
+# TASK 6 -- Distribution-based confidence gate for out-of-domain queries.
+#
+# Root cause this addresses: has_usable_context() in prompt_engineering.py
+# only checks "is the candidate list non-empty" -- it has no notion of
+# score quality. rerank() always returns its top_n=12 best-of-a-bad-lot
+# candidates even for a completely off-topic query (e.g. "What is
+# Artificial Intelligence?"), so has_usable_context() passes, sources get
+# built and shown in the UI ("Grounded in 16 retrieved clauses"), even
+# though every reranker_score is ~0 and Gemma correctly ignores all of
+# them and answers "not found" anyway. The mismatch is a sources/UI
+# problem, not an LLM problem.
+#
+# Fix: gate on the SCORE DISTRIBUTION of this query's own candidate pool,
+# not a single hand-picked constant:
+#   1. top_score below an absolute floor -> nothing cleared even a low
+#      relevance bar.
+#   2. top_score not meaningfully separated from the rest of the pool's
+#      scores -> the reranker isn't discriminating anything as more
+#      relevant than anything else, which is the out-of-domain signature
+#      (a real hit normally stands out above its own candidate pool).
+#
+# Calibration note: the two defaults below are a reasonable starting
+# point for BAAI/bge-reranker-v2-m3's sigmoid output, but MUST be
+# re-validated against this corpus's real query logs (see
+# scripts/calibrate_confidence.py) before being trusted in production --
+# override via the env vars rather than editing the constants directly.
+# ---------------------------------------------------------------------------
+
+MIN_ABSOLUTE_CONFIDENCE = float(os.environ.get("RAG_MIN_CONFIDENCE", "0.10"))
+MIN_SEPARATION_MARGIN = float(os.environ.get("RAG_MIN_SEPARATION", "0.08"))
+
+
+def evaluate_confidence(reranked: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Distribution-based low-confidence detector, meant to run on
+    rerank()'s output BEFORE sibling expansion / prompt building.
+
+    Parameters
+    ----------
+    reranked : list[dict]
+        rerank()'s output -- each entry must carry "reranker_score".
+
+    Returns
+    -------
+    dict
+        {"confident": bool, "top_score": float | None, "reason": str}
+        A dict rather than a bare bool so callers/logs can see *why* a
+        query was flagged low-confidence (useful for calibration and
+        for debugging false positives/negatives later).
+    """
+    if not reranked:
+        return {"confident": False, "top_score": None, "reason": "no_candidates"}
+
+    scores = sorted(
+        (c["reranker_score"] for c in reranked if c.get("reranker_score") is not None),
+        reverse=True,
+    )
+    if not scores:
+        return {"confident": False, "top_score": None, "reason": "no_scores"}
+
+    top_score = scores[0]
+
+    if top_score < MIN_ABSOLUTE_CONFIDENCE:
+        return {"confident": False, "top_score": top_score, "reason": "below_absolute_floor"}
+
+    rest = scores[1:]
+    if rest:
+        separation = top_score - statistics.median(rest)
+        if separation < MIN_SEPARATION_MARGIN:
+            return {"confident": False, "top_score": top_score, "reason": "no_separation_from_pool"}
+
+    return {"confident": True, "top_score": top_score, "reason": "ok"}
 
 
 # ---------------------------------------------------------------------------

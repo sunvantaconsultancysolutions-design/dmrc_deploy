@@ -57,8 +57,8 @@ from .bm25_index import rebuild_bm25_index
 from .hybrid_retriever import hybrid_search
 from .prompt_engineering import NO_CONTEXT_ANSWER, build_prompt, has_usable_context
 from .query import get_model as get_dense_model
-from .query import extract_clause_no, get_chunk_by_clause_no
-from .reranker import expand_with_siblings, get_reranker_model, rerank
+from .query import extract_clause_no, get_chunk_by_clause_no, get_chunks_by_parent_clause
+from .reranker import evaluate_confidence, expand_with_siblings, get_reranker_model, rerank
 from . import query as query_module
 from . import reranker as reranker_module
 from .gemma_inference import generate_answer, get_gemma_model
@@ -408,6 +408,38 @@ def ask(request: QueryRequest) -> AnswerResponse:
             logger.exception("Exact clause lookup failed for clause_no: %r", clause_no)
             candidates = []
 
+        # BUGFIX: a query naming a PARENT clause (e.g. "Explain Clause 6.8
+        # in detail and summarize all of its sub-clauses") also matches
+        # CLAUSE_NO_PATTERN on "6.8" and was taking this same exact-match
+        # fast path -- which returns only the single 6.8 chunk and then
+        # skips expand_with_siblings() entirely, since that only ever runs
+        # on the hybrid_search()/rerank() branch below, never on this one.
+        # Detect "clause_no has children" via the same metadata-only
+        # accessor sibling expansion already uses (no embedding, no ANN,
+        # near-free), and pull them in here. For a true leaf clause (e.g.
+        # "1.2.1", nothing declares it as a parent_clause) this returns []
+        # and candidates/exact_match behavior is unchanged from before.
+        if candidates:
+            try:
+                children = get_chunks_by_parent_clause(clause_no)
+            except Exception:
+                logger.exception(
+                    "Child-clause lookup failed for parent clause_no: %r", clause_no
+                )
+                children = []
+            if children:
+                already_ids = {c["chunk_id"] for c in candidates}
+                for child in children:
+                    if child["chunk_id"] in already_ids:
+                        continue
+                    entry = dict(child)
+                    entry["score"] = 1.0
+                    entry["retrieval_source"] = "exact_clause_family_match"
+                    entry["dense_score"] = None
+                    entry["bm25_score"] = None
+                    candidates.append(entry)
+                    already_ids.add(child["chunk_id"])
+
     # BUGFIX: track whether `candidates` came from the exact-metadata
     # match, not from hybrid_search()/rerank(). An exact clause_no hit
     # is already the highest-confidence result possible (score=1.0, set
@@ -442,6 +474,32 @@ def ask(request: QueryRequest) -> AnswerResponse:
         except Exception as exc:
             logger.error("Reranking failed for query: %r", query_text, exc_info=True)
             raise HTTPException(status_code=500, detail=f"Reranking failed: {exc}") from exc
+
+        # ------------------------------------------------------------
+        # TASK 6 -- low-confidence / out-of-domain short-circuit.
+        #
+        # Runs only on this branch -- the exact-clause-match path above
+        # is already maximally confident by construction (score=1.0) and
+        # must never be gated here. has_usable_context() below only
+        # checks non-emptiness, which an off-topic query still passes
+        # (rerank() always returns its top_n best-of-a-bad-lot
+        # candidates); this checks whether those candidates are actually
+        # good, using this query's own score distribution rather than a
+        # single hand-picked constant. See reranker.py::evaluate_confidence
+        # for the two signals used and the calibration caveat.
+        # ------------------------------------------------------------
+        confidence_info = evaluate_confidence(reranked)
+        if not confidence_info["confident"]:
+            if RAG_DEBUG:
+                logger.info(
+                    "Low-confidence retrieval for query %r: %s",
+                    query_text, confidence_info,
+                )
+            return AnswerResponse(
+                answer=NO_CONTEXT_ANSWER,
+                sources=[],
+                confidence=confidence_info["top_score"],
+            )
 
         # ------------------------------------------------------------
         # TASK 3 -- parent_clause sibling expansion.
@@ -501,5 +559,8 @@ def ask(request: QueryRequest) -> AnswerResponse:
     return AnswerResponse(
         answer=answer,
         sources=_build_sources(reranked),
-        confidence=None,
+        # BUGFIX: was hardcoded None even though reranker_score is
+        # available on every entry -- now reports the strongest score
+        # actually backing this answer.
+        confidence=(max((c.get("reranker_score") or 0.0) for c in reranked) if reranked else None),
     )

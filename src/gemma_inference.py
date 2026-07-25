@@ -102,8 +102,19 @@ MODEL_NAME = "google/gemma-2-9b-it"
 # has a sensible, conservative value in place.
 TEMPERATURE = 0.2
 DO_SAMPLE = False
-# Generation is sequential, so latency scales linearly with this.
-MAX_NEW_TOKENS = int(os.environ.get("GEMMA_MAX_NEW_TOKENS", "512"))
+# Generation is sequential, so latency scales linearly with this -- but
+# only with tokens ACTUALLY generated, not with this ceiling. With KV
+# caching, a short answer stops at EOS well under the cap regardless of
+# where the cap is set, so raising the cap doesn't add latency/memory to
+# queries that already finish early -- it only unlocks room for the ones
+# that were being cut off mid-sentence.
+#
+# BUGFIX: was 512, which is not enough for multi-clause synthesis answers
+# ("Describe the ECS lifecycle", "Describe contractor responsibilities",
+# "Explain testing and commissioning") -- these were being cut off
+# mid-sentence the instant generation hit the cap, not because Gemma had
+# actually finished. Raised to 1536; still overridable via the env var.
+MAX_NEW_TOKENS = int(os.environ.get("GEMMA_MAX_NEW_TOKENS", "1536"))
 
 # Load in 4-bit (bitsandbytes) on GPU only if explicitly requested.
 # Falls back to full bfloat16 automatically if bitsandbytes isn't
@@ -251,6 +262,18 @@ def generate_answer(prompt: str, max_new_tokens: Optional[int] = None) -> str:
             "Reduce the number of retrieved chunks.", input_length
         )
 
+    # BUGFIX: defensive EOS set. Gemma 2's chat template terminates a
+    # turn with <end_of_turn>, not the base <eos>. Recent transformers
+    # configs for gemma-2-9b-it already list both in
+    # generation_config.eos_token_id, but pinning it explicitly here
+    # means a natural stop is never missed regardless of the installed
+    # transformers/config version -- this is what lets a short answer
+    # stop early and avoid paying for the raised MAX_NEW_TOKENS cap above.
+    eos_ids = [tokenizer.eos_token_id]
+    end_of_turn_id = tokenizer.convert_tokens_to_ids("<end_of_turn>")
+    if end_of_turn_id is not None and end_of_turn_id not in eos_ids:
+        eos_ids.append(end_of_turn_id)
+
     _t0 = time.perf_counter()
     with torch.inference_mode():
         generation = model.generate(
@@ -258,6 +281,7 @@ def generate_answer(prompt: str, max_new_tokens: Optional[int] = None) -> str:
             max_new_tokens=n_new,
             do_sample=DO_SAMPLE,
             temperature=TEMPERATURE if DO_SAMPLE else None,
+            eos_token_id=eos_ids,
             use_cache=True,   # KV cache: without it every token re-attends over
                               # the whole prompt -- O(n^2) and fatal on long context
         )
@@ -265,6 +289,15 @@ def generate_answer(prompt: str, max_new_tokens: Optional[int] = None) -> str:
     _gen = generation.shape[-1] - input_length
     print(f"[gemma2] {input_length} prompt tok -> {_gen} new tok in {_elapsed:.1f}s "
           f"({_gen/_elapsed if _elapsed else 0:.1f} tok/s)", flush=True)
+
+    # BUGFIX: diagnostic for truncation. If generation used every token
+    # of budget, the cap (not a natural stop) is what ended the answer --
+    # surface that in logs instead of silently shipping a cut-off answer.
+    if _gen >= n_new:
+        logger.warning(
+            "generate_answer(): hit max_new_tokens=%d without a natural "
+            "stop (prompt=%d tok). Answer may be truncated.", n_new, input_length
+        )
 
     # model.generate() returns the full sequence (prompt tokens +
     # newly generated tokens) concatenated together. Slicing off the
