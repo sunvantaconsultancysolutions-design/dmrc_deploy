@@ -19,7 +19,7 @@ import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 
-from metadata_loader import build_chunk_records
+from metadata_loader import build_chunk_records, build_boq_chunk_records, is_boq_json
 from text_normalization import build_embedding_input, build_boq_embedding_input
 from batch_embed import embed_batch
 from storage import store_chunks
@@ -37,6 +37,17 @@ def _load_records(filepath: str, carry_over_record=None):
     filename = os.path.basename(filepath)
     with open(filepath, "r", encoding="utf-8") as f:
         parsed_json = json.load(f)
+
+    if is_boq_json(parsed_json):
+        # BOQ items carry no continues_previous flag (nothing spans a
+        # page/file boundary the way a clause can), so there is no new
+        # open_record to produce -- pass carry_over_record straight
+        # through unchanged so a later clause file in the same
+        # --input-dir run still sees whatever clause was left open by an
+        # earlier clause file.
+        records = build_boq_chunk_records(parsed_json, filename)
+        return filename, records, carry_over_record
+
     records, open_record = build_chunk_records(parsed_json, filename, carry_over_record=carry_over_record)
     return filename, records, open_record
 

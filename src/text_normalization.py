@@ -77,13 +77,18 @@ def build_boq_embedding_input(metadata: dict, text: str) -> str:
     Mirrors build_embedding_input()'s approach -- lightly prepend
     semantic/structural context ahead of the normalized chunk text --
     but draws on the BOQ metadata fields instead of clause_no/heading/
-    section_heading. Only fields with genuine retrieval value are
-    included (contract, schedule, discipline, section, item type, item
-    number, parent); identifiers and pipeline bookkeeping fields such as
-    chunk_id, chunk_hash, sequence numbers, approval_status, language,
-    stamps, and page labels are deliberately never concatenated in, to
-    keep the embedded text concise and free of retrieval-irrelevant
-    noise.
+    section_heading. Updated to use the fields the current BOQ
+    ChunkRecord objects actually carry (section_description,
+    item_header_description, subsection_description, panel_reference)
+    in place of the old discipline/section fields, which the metadata
+    never populated. Only fields with genuine retrieval value are
+    included; identifiers, pipeline bookkeeping fields (chunk_id,
+    chunk_hash, chunk_number, document_sequence, source_file,
+    page_label, language, approval_status, stamps), and numeric fields
+    (quantities, rate_in_inr, amount_in_inr, rate_in_foreign_currency,
+    amount_in_foreign_currency) are deliberately never concatenated in
+    -- they stay metadata-only, keeping the embedded text concise and
+    free of retrieval-irrelevant noise.
     """
     metadata = metadata or {}
     prefix_lines = []
@@ -96,13 +101,21 @@ def build_boq_embedding_input(metadata: dict, text: str) -> str:
     if schedule:
         prefix_lines.append(f"Schedule {schedule}")
 
-    discipline = metadata.get("discipline")
-    if discipline:
-        prefix_lines.append(f"Discipline {discipline}")
+    section_description = metadata.get("section_description")
+    if section_description:
+        prefix_lines.append(f"Section Description {section_description}")
 
-    section = metadata.get("section")
-    if section:
-        prefix_lines.append(f"Section {section}")
+    item_header_description = metadata.get("item_header_description")
+    if item_header_description:
+        prefix_lines.append(f"Item Header Description {item_header_description}")
+
+    subsection_description = metadata.get("subsection_description")
+    if subsection_description:
+        prefix_lines.append(f"Subsection Description {subsection_description}")
+
+    panel_reference = metadata.get("panel_reference")
+    if panel_reference:
+        prefix_lines.append(f"Panel Reference {panel_reference}")
 
     item_type = metadata.get("item_type")
     if item_type:
