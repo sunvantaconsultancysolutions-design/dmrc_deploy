@@ -58,13 +58,44 @@ from .hybrid_retriever import hybrid_search
 from .prompt_engineering import NO_CONTEXT_ANSWER, build_prompt, has_usable_context
 from .query import get_model as get_dense_model
 from .query import extract_clause_no, get_chunk_by_clause_no
-from .reranker import get_reranker_model, rerank
+from .reranker import expand_with_siblings, get_reranker_model, rerank
 from . import query as query_module
 from . import reranker as reranker_module
 from .gemma_inference import generate_answer, get_gemma_model
 from . import gemma_inference as gemma_module
 
 logger = logging.getLogger("dmrc_rag.api")
+
+# ---------------------------------------------------------------------------
+# TASK 4 -- Debug logging flag.
+#
+# Off by default (production-safe). Set RAG_DEBUG=1 in the environment
+# to print the clause_id list surviving each pipeline stage for every
+# /ask request. hybrid_retriever.py and reranker.py read this same env
+# var independently (see their own module-level RAG_DEBUG) so each
+# stage logs itself right where its output is computed, instead of
+# app.py reaching into their internals.
+# ---------------------------------------------------------------------------
+RAG_DEBUG = os.environ.get("RAG_DEBUG", "0") == "1"
+
+
+def _debug_clause_block(header: str, candidates: List[Dict[str, Any]], score_key: Optional[str] = None) -> None:
+    """Prints a 'clause_id [+ score]' block for one pipeline stage.
+    Only ever called when RAG_DEBUG is on -- see call sites below.
+    """
+    print("=" * 22)
+    print(header)
+    print("=" * 22)
+    if not candidates:
+        print("(none)")
+        return
+    for c in candidates:
+        clause_no = (c.get("metadata") or {}).get("clause_no", "N/A")
+        chunk_id = c.get("chunk_id", "N/A")
+        if score_key and c.get(score_key) is not None:
+            print(f"  {chunk_id}  clause={clause_no}  {score_key}={c[score_key]}")
+        else:
+            print(f"  {chunk_id}  clause={clause_no}")
 
 
 # ---------------------------------------------------------------------------
@@ -77,10 +108,21 @@ logger = logging.getLogger("dmrc_rag.api")
 # CLI-friendly defaults.
 # ---------------------------------------------------------------------------
 
-DENSE_TOP_K = 20        # Table 9.2: Dense Top-k
-BM25_TOP_K = 20         # Table 9.2: BM25 Top-k
-MERGED_CANDIDATE_POOL = 40   # Table 9.2 / 14.7: Merged Candidates / Retrieved Documents
-RERANK_TOP_N = 10       # Table 9.2 / 14.7: Final Re-ranked / Re-ranked Documents
+# AUDIT FOLLOW-UP (broad-query recall fix): widened from the original
+# 20/20/40/10 values. Forensic audit confirmed via a live BM25 run that
+# clause 6.8 (parent) and 6.8.3 ranked 25th and 30th for the query
+# "What spare parts, tools, and test equipment must the contractor
+# provide?" -- outside the old BM25_TOP_K=20 cutoff, so they never
+# reached hybrid merge. Raising BM25_TOP_K/DENSE_TOP_K to 30 pulls both
+# back into the candidate pool. MERGED_CANDIDATE_POOL is raised in step
+# so the wider dense+BM25 output isn't immediately re-truncated. This
+# does NOT fix clauses 6.8.5/6.8.6 (ranked 58th/59th) -- those are
+# addressed separately by parent_clause sibling expansion, see
+# reranker.py::expand_with_siblings().
+DENSE_TOP_K = 30        # was 20 -- Table 9.2: Dense Top-k
+BM25_TOP_K = 30         # was 20 -- Table 9.2: BM25 Top-k
+MERGED_CANDIDATE_POOL = 60   # was 40 -- Table 9.2 / 14.7: Merged Candidates / Retrieved Documents
+RERANK_TOP_N = 12       # was 10 -- Table 9.2 / 14.7: Final Re-ranked / Re-ranked Documents
 
 
 # ---------------------------------------------------------------------------
@@ -400,6 +442,30 @@ def ask(request: QueryRequest) -> AnswerResponse:
         except Exception as exc:
             logger.error("Reranking failed for query: %r", query_text, exc_info=True)
             raise HTTPException(status_code=500, detail=f"Reranking failed: {exc}") from exc
+
+        # ------------------------------------------------------------
+        # TASK 3 -- parent_clause sibling expansion.
+        #
+        # Only applied on the hybrid_search()/rerank() path, not the
+        # exact-clause-number fast path above: a query that already
+        # named one specific clause is asking about that clause, not
+        # its whole family, so expanding it would reintroduce the
+        # "answers get diluted" failure mode this whole audit started
+        # from. See reranker.py::expand_with_siblings() for the
+        # relevance-gated expansion logic and its own docstring for why
+        # this is safe.
+        # ------------------------------------------------------------
+        try:
+            reranked = expand_with_siblings(query_text, reranked)
+        except Exception:
+            # Sibling expansion is a recall *enhancement*, not a
+            # correctness requirement -- if it fails for any reason
+            # (e.g. a ChromaDB hiccup), fall back to the reranker's
+            # own output rather than failing the whole request.
+            logger.exception("Sibling expansion failed for query: %r; continuing without it.", query_text)
+
+    if RAG_DEBUG:
+        _debug_clause_block("Final Prompt (clauses sent to Gemma)", reranked, score_key="reranker_score")
 
     # 11.14 Handling Missing Information -- no reason to build a prompt
     # (or call an LLM) if retrieval found nothing at all.

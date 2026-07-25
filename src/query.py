@@ -208,6 +208,50 @@ def get_chunk_by_clause_no(clause_no: str):
     return candidates
 
 
+# ---------------------------------------------------------------------------
+# TASK 3 -- Sibling-clause lookup by parent_clause metadata.
+#
+# Same pattern as get_chunk_by_clause_no() above: a pure metadata
+# accessor (collection.get(where=...), no embedding, no ANN search), so
+# it costs nothing beyond a ChromaDB metadata filter. Used by
+# reranker.py::expand_with_siblings() to fetch the full sibling set of
+# a clause family (e.g. every 6.8.x chunk given parent_clause="6.8")
+# once the reranker's own output shows the user is asking about that
+# family broadly. This was previously stored in every chunk's metadata
+# (confirmed: all 6.8.x chunks carry parent_clause="6.8" in this
+# collection) but never read by any retrieval code -- this function is
+# the first caller.
+# ---------------------------------------------------------------------------
+
+def get_chunks_by_parent_clause(parent_clause: str):
+    """Metadata-only lookup of every chunk sharing the given
+    parent_clause (e.g. all children of "6.8"). Returns a list of
+    candidate dicts shaped like get_chunk_by_clause_no()'s output
+    (chunk_id, document, metadata) -- callers add their own
+    score/retrieval_source fields as appropriate for their use case.
+
+    Returns [] if parent_clause is falsy or nothing matches, so callers
+    can use this defensively without a separate existence check.
+    """
+    if not parent_clause:
+        return []
+
+    collection = get_collection()
+    result = collection.get(
+        where={"parent_clause": parent_clause},
+        include=["documents", "metadatas"],
+    )
+
+    ids = result.get("ids", [])
+    documents = result.get("documents", [])
+    metadatas = result.get("metadatas", [])
+
+    return [
+        {"chunk_id": chunk_id, "document": document, "metadata": metadata}
+        for chunk_id, document, metadata in zip(ids, documents, metadatas)
+    ]
+
+
 def print_results(query: str, results: list):
     """Pretty-print search results to the console."""
     print("=" * 70)

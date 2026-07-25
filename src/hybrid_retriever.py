@@ -76,10 +76,28 @@ single query benefit from both simultaneously instead of picking one.
 """
 
 import argparse
+import os
 from typing import Optional
 
 from .bm25_index import get_bm25_index
 from .query import search as dense_search, build_filter, get_model  # noqa: F401  (get_model re-exported for CLI warm-up parity with query.py)
+
+# TASK 4 -- debug logging flag, read independently here so this module
+# logs its own dense/BM25/merge output right where it's computed. Off
+# by default; set RAG_DEBUG=1 to enable.
+RAG_DEBUG = os.environ.get("RAG_DEBUG", "0") == "1"
+
+
+def _debug_clause_block(header: str, results: list) -> None:
+    print("=" * 22)
+    print(header)
+    print("=" * 22)
+    if not results:
+        print("(none)")
+        return
+    for r in results:
+        clause_no = (r.get("metadata") or {}).get("clause_no", "N/A")
+        print(f"  {r['chunk_id']}  clause={clause_no}")
 
 
 # ---------------------------------------------------------------------------
@@ -220,7 +238,16 @@ def hybrid_search(
     bm25_index = get_bm25_index()
     sparse_results = bm25_index.search(query, top_k=top_k_bm25, metadata_filter=metadata_filter)
 
-    return merge_candidates(dense_results, sparse_results, final_top_k=final_top_k)
+    if RAG_DEBUG:
+        _debug_clause_block("Dense Results", dense_results)
+        _debug_clause_block("BM25 Results", sparse_results)
+
+    merged = merge_candidates(dense_results, sparse_results, final_top_k=final_top_k)
+
+    if RAG_DEBUG:
+        _debug_clause_block("Merged Candidates", merged)
+
+    return merged
 
 
 # ---------------------------------------------------------------------------

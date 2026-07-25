@@ -56,7 +56,8 @@ a drop-in replacement for Chapter 9's output when handed to Chapter
 """
 
 import argparse
-from typing import Optional
+import os
+from typing import Any, Dict, List, Optional
 
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -66,6 +67,11 @@ MODEL_NAME = "BAAI/bge-reranker-v2-m3"
 DEFAULT_TOP_N = 10       # how many re-ranked results are returned to the caller
 DEFAULT_BATCH_SIZE = 16  # matches Section 14.7's recommended reranker batch size
 DEFAULT_MAX_LENGTH = 512  # matches Section 5.11's max token budget for a chunk
+
+# TASK 4 -- debug logging flag, read independently here (not passed down
+# from app.py) so this module logs its own output right where it's
+# computed. Off by default; set RAG_DEBUG=1 to enable.
+RAG_DEBUG = os.environ.get("RAG_DEBUG", "0") == "1"
 
 _tokenizer = None
 _model = None
@@ -187,7 +193,183 @@ def rerank(
         reranked.append(entry)
 
     reranked.sort(key=lambda c: c["reranker_score"], reverse=True)
-    return reranked[:top_n]
+    reranked = reranked[:top_n]
+
+    if RAG_DEBUG:
+        print("=" * 22)
+        print("After Reranker")
+        print("=" * 22)
+        for c in reranked:
+            clause_no = (c.get("metadata") or {}).get("clause_no", "N/A")
+            print(f"  {c['chunk_id']}  clause={clause_no}  reranker_score={c['reranker_score']}")
+
+    return reranked
+
+
+# ---------------------------------------------------------------------------
+# TASK 3 -- parent_clause sibling expansion.
+# ---------------------------------------------------------------------------
+#
+# Root cause this addresses (from the forensic audit): clause-based
+# chunking means a broad question like "what spare parts, tools, and
+# test equipment must the contractor provide?" is really asking about
+# an entire clause family (6.8, 6.8.1-6.8.8), but dense/BM25/reranker
+# all score chunks independently on text similarity -- they have no
+# notion of "these 9 chunks are one family." A sibling like 6.8.5
+# ("Routine Change") shares almost no vocabulary with the query and
+# legitimately scores low on both lexical and semantic grounds, so
+# widening top-k alone (Task 2) cannot fully fix this: verified live,
+# 6.8.5/6.8.6 rank 58th/59th out of 63 chunks even under BM25 alone.
+#
+# The fix does NOT change how retrieval scores anything. It runs once,
+# after the reranker has already produced its top_n list, and asks a
+# narrow question: "does this list already contain multiple members of
+# the same clause family?" If so, that is strong evidence the user's
+# question is about the family as a whole (not a single sub-topic that
+# happens to reuse a clause number), so it is safe to go check whether
+# any *other* members of that same family are also relevant enough to
+# include -- using the SAME cross-encoder score, not a guess, so
+# "relevant enough" is measured the same way the rest of the pipeline
+# already measures relevance.
+
+DEFAULT_MAX_EXTRA_PER_PARENT = 2   # cap per clause family
+DEFAULT_MAX_TOTAL_EXTRA = 4        # global cap across all families in one answer
+DEFAULT_SIBLING_TRIGGER = 2        # need >=N siblings already in reranked output to trigger expansion
+DEFAULT_RELEVANCE_MARGIN = 0.15    # a candidate sibling must score within this margin of the
+                                    # weakest already-included sibling from the same family
+
+
+def expand_with_siblings(
+    query: str,
+    reranked: List[Dict[str, Any]],
+    max_extra_per_parent: int = DEFAULT_MAX_EXTRA_PER_PARENT,
+    max_total_extra: int = DEFAULT_MAX_TOTAL_EXTRA,
+    sibling_trigger: int = DEFAULT_SIBLING_TRIGGER,
+    relevance_margin: float = DEFAULT_RELEVANCE_MARGIN,
+) -> List[Dict[str, Any]]:
+    """Given the reranker's already-finalized output, looks for clause
+    families (parent_clause) with multiple members already present, and
+    conditionally pulls in additional siblings of that family that the
+    cross-encoder confirms are still relevant to the query.
+
+    Parameters
+    ----------
+    query : str
+        The original user query (same string passed to rerank()).
+    reranked : list[dict]
+        rerank()'s output -- must carry "metadata" (with parent_clause,
+        if any) and "reranker_score" on every entry.
+    max_extra_per_parent : int
+        Hard cap on how many siblings can be added for any one family
+        (Task 5: keep prompt size reasonable).
+    max_total_extra : int
+        Hard cap on total additions across all families in this answer
+        (Task 5: bound total token growth regardless of how many
+        families the reranked list happens to touch).
+    sibling_trigger : int
+        Minimum number of a family's members that must already be in
+        `reranked` before that family is even considered for expansion.
+        Requiring >=2 (not >=1) avoids triggering on every single clause
+        that happens to have a parent_clause value -- a lone match is
+        normal, focused retrieval, not evidence of a broad "whole family"
+        question. This directly protects the case the audit's stated
+        constraint calls out: "Focused questions should continue
+        performing exactly as they do now."
+    relevance_margin : float
+        A held-out sibling is only added if its reranker_score is within
+        this margin of the *lowest* reranker_score already included from
+        the same family. This ties "genuinely relevant" (Task 5) to the
+        same score the reranker already uses, rather than an arbitrary
+        absolute cutoff that would behave differently across query types.
+
+    Returns
+    -------
+    list[dict]
+        `reranked` with 0 or more additional entries appended, each
+        carrying the same fields as a normal reranked entry plus
+        "retrieval_source": "sibling_expansion" so callers/logs/UI can
+        distinguish an expansion hit from an originally-ranked one.
+        Re-sorted by reranker_score descending. Never mutates the input
+        list's dicts in place.
+    """
+    if not reranked:
+        return reranked
+
+    # Lazy import: mirrors reranker.py's existing pattern of not taking a
+    # hard dependency on the retriever/query module layout at import time
+    # (see this file's own main()/hybrid_search import comment above).
+    from .query import get_chunks_by_parent_clause
+
+    already_included_ids = {c["chunk_id"] for c in reranked}
+
+    # Group already-reranked entries by parent_clause.
+    families: Dict[str, List[Dict[str, Any]]] = {}
+    for c in reranked:
+        parent = (c.get("metadata") or {}).get("parent_clause")
+        if not parent:
+            continue
+        families.setdefault(parent, []).append(c)
+
+    additions: List[Dict[str, Any]] = []
+
+    for parent, members in families.items():
+        if len(additions) >= max_total_extra:
+            break
+        if len(members) < sibling_trigger:
+            continue  # single match in this family -- treat as focused, not broad
+
+        weakest_included_score = min(m["reranker_score"] for m in members)
+
+        siblings = get_chunks_by_parent_clause(parent)
+        candidate_siblings = [s for s in siblings if s["chunk_id"] not in already_included_ids]
+        if not candidate_siblings:
+            continue
+
+        # Score candidate siblings with the SAME cross-encoder used for
+        # the main ranking, so "relevant enough" is measured consistently
+        # rather than guessed. This is a small extra call (typically 1-7
+        # short documents for a clause family in this corpus), not a
+        # second retrieval pass.
+        sibling_scores = _score_pairs(query, [s["document"] for s in candidate_siblings])
+
+        scored_siblings = sorted(
+            zip(candidate_siblings, sibling_scores), key=lambda pair: pair[1], reverse=True
+        )
+
+        added_for_this_parent = 0
+        for sibling, score in scored_siblings:
+            if added_for_this_parent >= max_extra_per_parent:
+                break
+            if len(additions) >= max_total_extra:
+                break
+            if score < weakest_included_score - relevance_margin:
+                continue  # not close enough to the family's own relevance bar
+
+            entry = dict(sibling)
+            entry["reranker_score"] = round(float(score), 4)
+            entry["retrieval_source"] = "sibling_expansion"
+            entry["score"] = entry["reranker_score"]
+            entry["dense_score"] = None
+            entry["bm25_score"] = None
+            additions.append(entry)
+            already_included_ids.add(sibling["chunk_id"])
+            added_for_this_parent += 1
+
+    if not additions:
+        return reranked
+
+    expanded = list(reranked) + additions
+    expanded.sort(key=lambda c: c["reranker_score"], reverse=True)
+
+    if RAG_DEBUG:
+        print("=" * 22)
+        print("Sibling Expansion")
+        print("=" * 22)
+        for c in additions:
+            clause_no = (c.get("metadata") or {}).get("clause_no", "N/A")
+            print(f"  +{c['chunk_id']}  clause={clause_no}  reranker_score={c['reranker_score']}")
+
+    return expanded
 
 
 # ---------------------------------------------------------------------------

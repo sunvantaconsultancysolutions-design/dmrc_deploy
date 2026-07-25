@@ -18,8 +18,26 @@ import os
 import src.hybrid_retriever as hybrid_retriever
 import src.reranker as reranker
 
-MAX_CANDIDATES = int(os.environ.get("RAG_MAX_CANDIDATES", "20"))  # into reranker
-MAX_CONTEXT = int(os.environ.get("RAG_MAX_CONTEXT", "15"))          # into the LLM
+# AUDIT FOLLOW-UP:
+#
+# MAX_CANDIDATES: raised from 20 -> 30 (repository default) to match
+# app.py's widened MERGED_CANDIDATE_POOL (Task 2). Cost check: the
+# reranker batches in groups of DEFAULT_BATCH_SIZE=16 (reranker.py), so
+# 20 candidates already took ceil(20/16)=2 batches and 30 candidates
+# still take ceil(30/16)=2 batches -- this change adds essentially zero
+# reranker latency.
+#
+# MAX_CONTEXT: left at the repository default of 15. This was NEVER the
+# bug -- the forensic audit found the "grounded in 4 clauses" behavior
+# was caused by the Colab deployment notebook setting RAG_MAX_CONTEXT=4
+# at launch time (overriding this default), not by anything in this
+# file. See the updated dmrc_deploy_colab_runner.ipynb, which now omits
+# that override entirely so this repository default is what actually
+# governs production. 15 comfortably exceeds RERANK_TOP_N=12 (app.py),
+# so this cap no longer fires in normal operation at all -- it remains
+# only as a defensive ceiling against a future misconfiguration.
+MAX_CANDIDATES = int(os.environ.get("RAG_MAX_CANDIDATES", "30"))  # was 20 -- into reranker
+MAX_CONTEXT = int(os.environ.get("RAG_MAX_CONTEXT", "15"))          # unchanged -- into the LLM
 
 _orig_hybrid = hybrid_retriever.hybrid_search
 _orig_rerank = reranker.rerank
