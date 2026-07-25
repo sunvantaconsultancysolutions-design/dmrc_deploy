@@ -1,5 +1,7 @@
 # Virtual environment
 .venv/
+# ChromaDB generated database
+chroma_db/
 
 # Python cache
 __pycache__/
