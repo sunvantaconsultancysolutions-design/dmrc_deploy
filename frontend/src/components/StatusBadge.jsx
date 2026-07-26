@@ -11,8 +11,17 @@ export default function StatusBadge() {
       try {
         const s = await getStatus();
         if (cancelled) return;
+        // BUGFIX (pre-deployment review, confirmed Bug #2): previously
+        // omitted s.gemma_model_loaded, so the badge could report
+        // "Models ready" while Gemma -- by far the slowest model to warm
+        // up (~18GB) and the one that actually generates the answer --
+        // was still loading. A user's first real question could then
+        // hang for minutes with the UI claiming everything was ready.
         const ready =
-          s.dense_model_loaded && s.reranker_model_loaded && s.chromadb_connected;
+          s.dense_model_loaded &&
+          s.reranker_model_loaded &&
+          s.gemma_model_loaded &&
+          s.chromadb_connected;
         setState(ready ? "ready" : "warming");
       } catch {
         if (!cancelled) setState("offline");

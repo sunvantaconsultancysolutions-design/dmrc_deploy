@@ -44,7 +44,7 @@ import os
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -392,25 +392,47 @@ def _build_sources(reranked_candidates: List[Dict[str, Any]]) -> List[SourceItem
 # ingestion run (e.g. once BOQ rows are added) so BM25 catches up
 # without needing to restart the whole server.
 #
-# QA REVIEW (Issue 6) -- deployment note, not a code change: this
-# endpoint is unauthenticated by design for this project's current
-# deployment model (a single private RunPod pod, called only by the
-# operator and by the Vercel frontend via /ask, with ALLOWED_ORIGINS
-# gating browser access). It is read-only against ChromaDB (rebuilds
-# an in-memory BM25 index; never writes to the database), so its
-# worst-case impact if reached is a wasted rebuild, not data loss. If
-# this API is ever exposed on a public network without a trusted
-# network boundary in front of it, add authentication (e.g. an API
-# key checked via FastAPI dependency injection) before that exposure,
-# not after.
+# QA REVIEW (Issue 6) -- deployment note: this endpoint was previously
+# unauthenticated by design for this project's current deployment model
+# (a single private RunPod pod, called only by the operator and by the
+# Vercel frontend via /ask, with ALLOWED_ORIGINS gating browser access).
+# It is read-only against ChromaDB (rebuilds an in-memory BM25 index;
+# never writes to the database), so its worst-case impact if reached is
+# a wasted rebuild, not data loss.
+#
+# SECURITY FIX (pre-deployment review): added a lightweight, OPT-IN API
+# key check rather than a new auth system. If the ADMIN_API_KEY
+# environment variable is set, this endpoint requires a matching
+# `X-Admin-Key` header (401 otherwise). If ADMIN_API_KEY is unset
+# (unset by default -- e.g. local dev, or any deployment that hasn't
+# opted in yet), the endpoint remains open exactly as before, so
+# existing deployments are not broken by this change. Set ADMIN_API_KEY
+# at `docker run` / deploy time to require the header in production.
 # ---------------------------------------------------------------------------
+
+ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY", "")
+
+
+def _require_admin_key(x_admin_key: Optional[str] = Header(default=None)) -> None:
+    """FastAPI dependency: no-op (endpoint stays open) when ADMIN_API_KEY
+    isn't configured; otherwise requires `X-Admin-Key` to match it.
+    """
+    if not ADMIN_API_KEY:
+        return
+    if x_admin_key != ADMIN_API_KEY:
+        raise HTTPException(status_code=401, detail="Missing or invalid X-Admin-Key header.")
+
 
 class ReloadBM25Response(BaseModel):
     status: str
     chunks_indexed: int
 
 
-@app.post("/admin/reload-bm25", response_model=ReloadBM25Response)
+@app.post(
+    "/admin/reload-bm25",
+    response_model=ReloadBM25Response,
+    dependencies=[Depends(_require_admin_key)],
+)
 def reload_bm25() -> ReloadBM25Response:
     try:
         index = rebuild_bm25_index()
@@ -485,26 +507,41 @@ def ask(request: QueryRequest) -> AnswerResponse:
         # near-free), and pull them in here. For a true leaf clause (e.g.
         # "1.2.1", nothing declares it as a parent_clause) this returns []
         # and candidates/exact_match behavior is unchanged from before.
-        if candidates:
-            try:
-                children = get_chunks_by_parent_clause(clause_no)
-            except Exception:
-                logger.exception(
-                    "Child-clause lookup failed for parent clause_no: %r", clause_no
-                )
-                children = []
-            if children:
-                already_ids = {c["chunk_id"] for c in candidates}
-                for child in children:
-                    if child["chunk_id"] in already_ids:
-                        continue
-                    entry = dict(child)
-                    entry["score"] = 1.0
-                    entry["retrieval_source"] = "exact_clause_family_match"
-                    entry["dense_score"] = None
-                    entry["bm25_score"] = None
-                    candidates.append(entry)
-                    already_ids.add(child["chunk_id"])
+        #
+        # BUGFIX (pre-deployment review, confirmed Bug #1): this lookup
+        # previously only ran when `candidates` was already non-empty
+        # (i.e. only when a self-referencing clause_no row also exists,
+        # as with "6.8"). That silently skipped clause families that have
+        # NO self row at all -- e.g. "6.7.2", which only exists in this
+        # corpus as children "6.7.2-1".."6.7.2-4" carrying
+        # parent_clause=="6.7.2". A query like "Explain Clause 6.7.2" then
+        # fell straight through to hybrid_search() instead of returning
+        # its exact-match family. Running this lookup unconditionally
+        # (not gated on `if candidates:`) covers both shapes -- families
+        # with a self row (candidates starts non-empty, siblings are
+        # added on top) and families with only children (candidates
+        # starts empty and is populated entirely from this lookup) --
+        # while a true leaf clause (e.g. "1.2.1", nothing declares it as
+        # a parent_clause) still returns [] and is unaffected either way.
+        try:
+            children = get_chunks_by_parent_clause(clause_no)
+        except Exception:
+            logger.exception(
+                "Child-clause lookup failed for parent clause_no: %r", clause_no
+            )
+            children = []
+        if children:
+            already_ids = {c["chunk_id"] for c in candidates}
+            for child in children:
+                if child["chunk_id"] in already_ids:
+                    continue
+                entry = dict(child)
+                entry["score"] = 1.0
+                entry["retrieval_source"] = "exact_clause_family_match"
+                entry["dense_score"] = None
+                entry["bm25_score"] = None
+                candidates.append(entry)
+                already_ids.add(child["chunk_id"])
 
     # ----------------------------------------------------------------
     # NEW: Exact BOQ-item fast path (see query.py's
