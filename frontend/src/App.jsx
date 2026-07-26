@@ -17,11 +17,11 @@ const SUGGESTION_GROUPS = [
     ],
   },
   {
-    icon: "📋",
-    label: "Bill of Quantities (BOQ)",
+   icon: "📄",
+    label: "Contract Clauses",
     questions: [
-      "What is included in the Digital Ammeter?",
-      "What is the overall tender amount?",
+      "What documents form the contract?",
+      "Who is responsible for obtaining clearances?",
     ],
   },
 ];
