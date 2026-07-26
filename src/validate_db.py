@@ -11,7 +11,17 @@ deletes any data in the collection.
 
 import sys
 
-from storage import get_collection
+# QA FIX (Issue 4): support both invocation styles used elsewhere in this
+# repo. `python -m src.validate_db` runs this as part of the `src` package,
+# where only a relative import resolves; `python src/validate_db.py` runs
+# it as a standalone script, where Python puts src/ itself on sys.path and
+# only the bare absolute import resolves. Try the package-relative form
+# first (the convention every other module here follows), and fall back
+# to the absolute form so direct execution keeps working unchanged.
+try:
+    from .storage import get_collection
+except ImportError:
+    from storage import get_collection
 
 # BGE-M3 embeddings are expected to be 1024-dimensional. Kept as a named
 # constant so the check below is self-explanatory and easy to update.

@@ -68,10 +68,15 @@ COPY chroma_db/ ./chroma_db/
 # the risk of an operator mistaking a wide-open CORS default for an
 # intentional production setting. Set ALLOWED_ORIGINS explicitly at
 # `docker run` / deploy time instead.
+# QA FIX (Issue 1): this was previously 512, which silently re-imposed
+# the exact truncated-answer bug that gemma_inference.py's own
+# MAX_NEW_TOKENS default (1536) was raised to fix. Keep this in sync
+# with gemma_inference.py's MAX_NEW_TOKENS constant -- it exists here
+# only so the value is explicit and auditable, not to diverge from it.
 ENV RAG_MAX_CANDIDATES=60 \
     RAG_MAX_CONTEXT=12 \
     GEMMA_USE_4BIT=0 \
-    GEMMA_MAX_NEW_TOKENS=512
+    GEMMA_MAX_NEW_TOKENS=1536
 
 EXPOSE 8000
 

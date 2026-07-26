@@ -136,7 +136,7 @@ def deduplicate_candidates(candidates: List[Dict[str, Any]]) -> List[Dict[str, A
     return deduped
 
 
-def _format_document_name(metadata: Dict[str, Any]) -> Optional[str]:
+def get_document_name(metadata: Dict[str, Any]) -> Optional[str]:
     """Turns a raw source-file reference into a readable document title.
 
     If metadata already carries a descriptive title (e.g. from a
@@ -144,12 +144,23 @@ def _format_document_name(metadata: Dict[str, Any]) -> Optional[str]:
     (e.g. "chapter3.json") is cleaned up into something readable
     (e.g. "Chapter 3") purely for display -- the underlying metadata
     and retrieval logic are untouched.
+
+    QA FIX (Issue 3): BOQ chunk metadata never carries "document_title"
+    or "document_name" -- metadata_loader.py stores the source PDF
+    filename under "source_pdf" instead for BOQ records. Falling back
+    to that field here (rather than duplicating it into "document_name"
+    at ingestion time) means every reader of this metadata sees a
+    document name for BOQ chunks too. Exposed as a public, shared
+    accessor (like get_boq_item_number/get_boq_page_number above) so
+    app.py's API layer resolves this identically to this module's
+    prompt formatting, instead of maintaining a second, independent
+    copy of this lookup.
     """
     document_title = metadata.get("document_title")
     if document_title:
         return document_title
 
-    document_name = metadata.get("document_name")
+    document_name = metadata.get("document_name") or metadata.get("source_pdf")
     if not document_name:
         return None
 
@@ -201,7 +212,7 @@ def _format_boq_block(index: int, candidate: Dict[str, Any]) -> str:
     page_number = get_boq_page_number(metadata)
     if page_number not in (None, ""):
         footer_parts.append(f"Page {page_number}")
-    document_name = _format_document_name(metadata)
+    document_name = get_document_name(metadata)
     if document_name:
         footer_parts.append(f"Source Document: {document_name}")
     if footer_parts:
@@ -262,7 +273,7 @@ def format_context(candidates: List[Dict[str, Any]]) -> str:
         item_number = metadata.get("item_number")
         if item_number:
             detail_parts.append(f"BOQ Item {item_number}")
-        document_name = _format_document_name(metadata)
+        document_name = get_document_name(metadata)
         if document_name:
             detail_parts.append(f"Source Document: {document_name}")
         if detail_parts:

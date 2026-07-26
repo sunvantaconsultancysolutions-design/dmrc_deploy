@@ -48,11 +48,14 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from . import retrieval_caps  # noqa: F401 -- side-effect import, must run
-                                # before hybrid_search/rerank are called
+from . import retrieval_caps  # side-effect import, must run before
+                                # hybrid_search/rerank/expand_with_siblings/
+                                # get_chunks_by_parent_clause are imported
                                 # below so RAG_MAX_CANDIDATES/RAG_MAX_CONTEXT
                                 # actually cap retrieval breadth (see
-                                # retrieval_caps.py's docstring)
+                                # retrieval_caps.py's docstring). Also
+                                # referenced directly below (retrieval_caps.MAX_CONTEXT)
+                                # as a final backstop before prompt construction.
 from .bm25_index import rebuild_bm25_index
 from .hybrid_retriever import hybrid_search
 from .prompt_engineering import (
@@ -60,6 +63,7 @@ from .prompt_engineering import (
     build_prompt,
     get_boq_item_number,
     get_boq_page_number,
+    get_document_name,
     has_usable_context,
 )
 from .query import get_model as get_dense_model
@@ -358,7 +362,7 @@ def _build_sources(reranked_candidates: List[Dict[str, Any]]) -> List[SourceItem
             SourceItem(
                 clause=metadata.get("clause_no"),
                 page=page,
-                document=metadata.get("document_name"),
+                document=get_document_name(metadata),
                 item_number=item_number,
                 retrieval_source=candidate.get("retrieval_source"),
                 reranker_score=candidate.get("reranker_score"),
@@ -376,6 +380,18 @@ def _build_sources(reranked_candidates: List[Dict[str, Any]]) -> List[SourceItem
 # sees new data, but BM25 does not. Call this endpoint once after any
 # ingestion run (e.g. once BOQ rows are added) so BM25 catches up
 # without needing to restart the whole server.
+#
+# QA REVIEW (Issue 6) -- deployment note, not a code change: this
+# endpoint is unauthenticated by design for this project's current
+# deployment model (a single private RunPod pod, called only by the
+# operator and by the Vercel frontend via /ask, with ALLOWED_ORIGINS
+# gating browser access). It is read-only against ChromaDB (rebuilds
+# an in-memory BM25 index; never writes to the database), so its
+# worst-case impact if reached is a wasted rebuild, not data loss. If
+# this API is ever exposed on a public network without a trusted
+# network boundary in front of it, add authentication (e.g. an API
+# key checked via FastAPI dependency injection) before that exposure,
+# not after.
 # ---------------------------------------------------------------------------
 
 class ReloadBM25Response(BaseModel):
@@ -554,6 +570,23 @@ def ask(request: QueryRequest) -> AnswerResponse:
             # (e.g. a ChromaDB hiccup), fall back to the reranker's
             # own output rather than failing the whole request.
             logger.exception("Sibling expansion failed for query: %r; continuing without it.", query_text)
+
+    # QA FIX (Issue 2) -- final safety net. retrieval_caps.py now caps
+    # hybrid_search(), rerank(), expand_with_siblings(), and
+    # get_chunks_by_parent_clause() individually, but this one extra
+    # check guarantees the configured context budget
+    # (retrieval_caps.MAX_CONTEXT) is never exceeded by the prompt no
+    # matter which combination of paths produced `reranked` -- e.g. the
+    # exact-clause-match branch above concatenates get_chunk_by_clause_no()
+    # (uncapped, normally 1 chunk) with the now-capped children list, so
+    # this backstop is what turns "normally fine" into "guaranteed".
+    if len(reranked) > retrieval_caps.MAX_CONTEXT:
+        if RAG_DEBUG:
+            logger.info(
+                "Trimming final candidate list %d -> %d (retrieval_caps.MAX_CONTEXT) "
+                "before prompt construction.", len(reranked), retrieval_caps.MAX_CONTEXT,
+            )
+        reranked = reranked[: retrieval_caps.MAX_CONTEXT]
 
     if RAG_DEBUG:
         _debug_clause_block("Final Prompt (clauses sent to Gemma)", reranked, score_key="reranker_score")

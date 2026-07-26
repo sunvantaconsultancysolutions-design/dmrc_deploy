@@ -13,6 +13,15 @@
 
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
+// QA FIX (Issue 7): askQuestion() previously had no timeout at all when
+// called without an explicit `signal` (the only way App.jsx calls it
+// today), so a hung backend request left the UI spinning indefinitely.
+// 2 minutes is generous enough for a slow CPU-fallback generation or a
+// GPU pod that finished its (separately health-checked) cold start but
+// is still under load -- this is not meant to cover the documented
+// 10-20 minute cold-start window itself, only a single /ask call.
+const DEFAULT_ASK_TIMEOUT_MS = 120_000;
+
 async function parseErrorDetail(res) {
   try {
     const body = await res.json();
@@ -23,11 +32,16 @@ async function parseErrorDetail(res) {
 }
 
 export async function askQuestion(query, signal) {
+  // Preserve the existing signature/behavior for any caller that already
+  // supplies its own AbortSignal; only fall back to a default timeout
+  // when none is given.
+  const effectiveSignal = signal ?? AbortSignal.timeout(DEFAULT_ASK_TIMEOUT_MS);
+
   const res = await fetch(`${API_URL}/ask`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query }),
-    signal,
+    signal: effectiveSignal,
   });
 
   if (!res.ok) {

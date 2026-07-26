@@ -12,10 +12,25 @@ Imported for its side effects: wraps hybrid_search() and rerank() in place
 so every caller -- including app.py's /ask endpoint -- gets bounded output
 without any change to app.py itself. app.py imports this module once at
 startup (see the import added near the top of app.py).
+
+QA FIX (Issue 2): also wraps reranker.expand_with_siblings() and
+query.get_chunks_by_parent_clause(), the same way. Neither was
+previously capped here, which meant two paths could put more than
+MAX_CONTEXT chunks in front of the LLM despite this module's name:
+  - expand_with_siblings() runs AFTER rerank() and can append up to
+    4 more chunks on top of an already-capped list.
+  - get_chunks_by_parent_clause() is called directly by app.py's
+    exact-clause-number fast path (a query naming a parent clause),
+    which never goes through hybrid_search()/rerank() at all.
+Wrapping query.get_chunks_by_parent_clause() here also transparently
+caps it inside expand_with_siblings() (which imports that same name
+fresh on every call -- see reranker.py's own lazy `from .query import
+get_chunks_by_parent_clause`), so one wrap covers both call sites.
 """
 import os
 
 import src.hybrid_retriever as hybrid_retriever
+import src.query as query_module
 import src.reranker as reranker
 
 # AUDIT FOLLOW-UP:
@@ -41,6 +56,8 @@ MAX_CONTEXT = int(os.environ.get("RAG_MAX_CONTEXT", "15"))          # unchanged 
 
 _orig_hybrid = hybrid_retriever.hybrid_search
 _orig_rerank = reranker.rerank
+_orig_expand_with_siblings = reranker.expand_with_siblings
+_orig_get_chunks_by_parent_clause = query_module.get_chunks_by_parent_clause
 
 
 def _capped_hybrid(*args, **kwargs):
@@ -59,5 +76,27 @@ def _capped_rerank(*args, **kwargs):
     return out
 
 
+def _capped_expand_with_siblings(*args, **kwargs):
+    # expand_with_siblings() already sorts its output by reranker_score
+    # descending before returning, so truncating to MAX_CONTEXT here
+    # keeps the highest-scoring chunks (original + siblings combined),
+    # not an arbitrary cut.
+    out = _orig_expand_with_siblings(*args, **kwargs)
+    if out and len(out) > MAX_CONTEXT:
+        print(f"[cap] expand_with_siblings {len(out)} -> {MAX_CONTEXT}", flush=True)
+        out = out[:MAX_CONTEXT]
+    return out
+
+
+def _capped_get_chunks_by_parent_clause(*args, **kwargs):
+    out = _orig_get_chunks_by_parent_clause(*args, **kwargs)
+    if out and len(out) > MAX_CONTEXT:
+        print(f"[cap] get_chunks_by_parent_clause {len(out)} -> {MAX_CONTEXT}", flush=True)
+        out = out[:MAX_CONTEXT]
+    return out
+
+
 hybrid_retriever.hybrid_search = _capped_hybrid
 reranker.rerank = _capped_rerank
+reranker.expand_with_siblings = _capped_expand_with_siblings
+query_module.get_chunks_by_parent_clause = _capped_get_chunks_by_parent_clause
