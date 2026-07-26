@@ -209,6 +209,124 @@ def get_chunk_by_clause_no(clause_no: str):
 
 
 # ---------------------------------------------------------------------------
+# TASK 4 -- Exact BOQ-Item-Number Fast Path
+#
+# Problem: exactly the same problem get_chunk_by_clause_no() above solves
+# for clauses, but for Bill-of-Quantities rows. Dense retrieval (semantic
+# similarity on chunk TEXT) and BM25 (lexical term matching on chunk TEXT)
+# both rank candidates by how well the query's *wording* matches the
+# chunk's wording -- neither one does an exact lookup against the BOQ
+# identifier metadata fields (`parent`, `s_no`, `item_header_no`,
+# `section_no`). So a query like "Describe BOQ item 1.02.E.2" can fail to
+# rank the correct item first, even though some chunk's metadata carries
+# that identifier verbatim.
+#
+# Fix: before hybrid retrieval runs (and after the clause fast path above
+# has already had its turn -- see app.py), check whether the query names
+# a BOQ-item-shaped identifier. If it does, do a metadata-only ChromaDB
+# lookup (collection.get(where=...), NOT collection.query()) against the
+# BOQ identifier fields, in priority order. This needs no embedding, no
+# BM25, and always finds the item if it exists. Mirrors
+# get_chunk_by_clause_no()'s design exactly, one metadata field at a time.
+# Does not touch embeddings, bm25_index.py, hybrid_retriever.py, or
+# metadata_loader.py. If no exact match is found, the caller (app.py)
+# falls back to the existing hybrid_search() pipeline unchanged.
+# ---------------------------------------------------------------------------
+
+# Matches BOQ item identifiers like "1.02.E.2", "1.02.E", "4.2", "1.01":
+# one or more digits, followed by 1-4 more separator+segment groups, where
+# each segment may be digits (an item/sub-item number) OR a single letter
+# (a sub-section marker, e.g. the "E" in "1.02.E.2"). This differs from
+# CLAUSE_NO_PATTERN above only in allowing a single-letter segment, since
+# BOQ identifiers -- unlike clause numbers -- can carry a lettered
+# sub-section reference in the middle of the dotted path.
+BOQ_ITEM_PATTERN = re.compile(r"\b(\d+(?:\.[A-Za-z0-9]+){1,4})\b")
+
+# BOQ metadata fields that carry a chunk's own identifier, checked in
+# this exact order (per the task's specification). `parent` is checked
+# first because a fully-qualified identifier such as "1.02.E.2" is the
+# field every sub-item (a), b), c), ...) filed under that reference
+# actually carries -- matching on it returns the whole item family, the
+# BOQ-pipeline equivalent of get_chunks_by_parent_clause()'s family
+# semantics for clauses. `s_no` / `item_header_no` / `section_no` cover
+# shallower identifiers (e.g. "4.2", "1.01") that a query may name
+# directly instead of naming a specific sub-item's parent.
+BOQ_IDENTIFIER_FIELDS = ("parent", "s_no", "item_header_no", "section_no")
+
+
+def extract_boq_item_no(query_text: str):
+    """Return the first BOQ-item-shaped token found in `query_text`,
+    exactly as typed (e.g. "1.02.E.2" out of "Describe BOQ item
+    1.02.E.2"), or None if the query doesn't contain one. Pure string
+    matching -- no model call, no DB call, no normalization here (BOQ
+    identifiers are stored and matched verbatim, unlike clause numbers,
+    which have a separate normalized form).
+    """
+    match = BOQ_ITEM_PATTERN.search(query_text)
+    return match.group(1) if match else None
+
+
+def get_chunk_by_boq_item_no(item_no: str):
+    """Exact metadata lookup for a BOQ item identifier, bypassing
+    dense/BM25 retrieval entirely. This is the BOQ-pipeline equivalent
+    of get_chunk_by_clause_no() above, applying the same
+    collection.get(where=...) approach to the BOQ identifier fields
+    (`parent`, `s_no`, `item_header_no`, `section_no`) instead of
+    `clause_no` / `clause_no_normalized`.
+
+    Tries each field in BOQ_IDENTIFIER_FIELDS, in order, stopping at the
+    first field that yields at least one match -- exactly the same
+    "try, then fall through" pattern get_chunk_by_clause_no() uses for
+    its two clause_no lookups, just extended to four candidate fields
+    instead of two. A match on `parent` naturally returns every sub-item
+    chunk sharing that parent (e.g. all of "1.02.E.2"'s a)-o) sub-items),
+    since `where` matches every chunk whose field equals `item_no`.
+
+    Uses collection.get(where=...) rather than collection.query(...):
+    .get() is ChromaDB's metadata-only accessor (no query embedding, no
+    ANN search), which is exactly what an exact BOQ item match needs.
+
+    Returns a list of candidate dicts shaped to match
+    get_chunk_by_clause_no()'s output exactly (chunk_id, document,
+    metadata, score, retrieval_source, dense_score, bm25_score) so it
+    can be fed straight into the existing rerank() / build_prompt() /
+    _build_sources() code with no changes to any of them. Returns []
+    if no chunk carries this identifier under any of the candidate
+    fields, so the caller falls back to hybrid_search() exactly as
+    before.
+    """
+    collection = get_collection()
+
+    result = {"ids": [], "documents": [], "metadatas": []}
+    for field in BOQ_IDENTIFIER_FIELDS:
+        result = collection.get(
+            where={field: item_no},
+            include=["documents", "metadatas"],
+        )
+        if result.get("ids"):
+            break
+
+    ids = result.get("ids", [])
+    documents = result.get("documents", [])
+    metadatas = result.get("metadatas", [])
+
+    candidates = []
+    for chunk_id, document, metadata in zip(ids, documents, metadatas):
+        candidates.append(
+            {
+                "chunk_id": chunk_id,
+                "document": document,
+                "metadata": metadata,
+                "score": 1.0,  # exact metadata match -- highest possible confidence
+                "retrieval_source": "exact_boq_item_match",
+                "dense_score": None,
+                "bm25_score": None,
+            }
+        )
+    return candidates
+
+
+# ---------------------------------------------------------------------------
 # TASK 3 -- Sibling-clause lookup by parent_clause metadata.
 #
 # Same pattern as get_chunk_by_clause_no() above: a pure metadata
