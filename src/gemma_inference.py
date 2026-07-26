@@ -66,6 +66,7 @@ matters more for a QA tool that has to be trusted.
 
 import logging
 import os
+import re
 import time
 from typing import Optional, Tuple
 
@@ -247,6 +248,34 @@ def get_gemma_model() -> Tuple[AutoModelForCausalLM, AutoTokenizer, str]:
 # 12.12 Inference -- prompt in, decoded answer string out
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# UI FIX -- strip literal markdown bold markers from the final answer.
+#
+# The frontend renders `answer` as plain text (a single <p>{content}</p> in
+# Message.jsx, no markdown parser), but Gemma's generations follow normal
+# markdown conventions and wrap emphasized terms in "**...**". With no
+# renderer to interpret that, the user sees literal asterisks in the chat
+# bubble (e.g. "**Documentation and Submissions:**"). Rather than adding a
+# markdown renderer to the frontend (a larger UI change than asked for),
+# this strips "**" here, at the one place the final answer string is
+# produced, so every caller (the /ask endpoint, any future caller of
+# generate_answer()) gets plain prose without needing its own cleanup step.
+# ---------------------------------------------------------------------------
+
+_MARKDOWN_BOLD_PATTERN = re.compile(r"\*\*(.+?)\*\*", re.DOTALL)
+
+
+def _strip_markdown_bold(text: str) -> str:
+    """Removes markdown bold emphasis from `text`, keeping the wrapped
+    words: "**Digital Ammeter**" -> "Digital Ammeter". Also removes any
+    leftover unpaired "**" (e.g. a bold span left open by a
+    max_new_tokens-truncated generation, see the truncation warning
+    above) so a dangling "**" never leaks into the response either.
+    """
+    text = _MARKDOWN_BOLD_PATTERN.sub(r"\1", text)
+    return text.replace("**", "")
+
+
 def generate_answer(prompt: str, max_new_tokens: Optional[int] = None) -> str:
     """Run Gemma 2 inference on a fully-assembled prompt string.
 
@@ -337,7 +366,7 @@ def generate_answer(prompt: str, max_new_tokens: Optional[int] = None) -> str:
     new_tokens = generation[0][input_length:]
 
     answer = tokenizer.decode(new_tokens, skip_special_tokens=True)
-    return answer.strip()
+    return _strip_markdown_bold(answer.strip())
 
 
 # ---------------------------------------------------------------------------

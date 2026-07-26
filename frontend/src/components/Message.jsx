@@ -36,7 +36,7 @@ export default function Message({ role, content, sources, isError, isLoading }) 
   return (
     <div className={`msg-row ${isUser ? "msg-row--user" : "msg-row--assistant"}`}>
       <div className="msg-avatar" aria-hidden="true">
-        {isUser ? "You" : "DM"}
+        {isUser ? "You" : "SV"}
       </div>
 
       <div className="msg-column">
