@@ -68,6 +68,7 @@ from .prompt_engineering import (
 )
 from .query import get_model as get_dense_model
 from .query import extract_clause_no, get_chunk_by_clause_no, get_chunks_by_parent_clause
+from .query import extract_boq_item_no, get_chunk_by_boq_item_no
 from .reranker import evaluate_confidence, expand_with_siblings, get_reranker_model, rerank
 from . import query as query_module
 from . import reranker as reranker_module
@@ -424,11 +425,17 @@ def ask(request: QueryRequest) -> AnswerResponse:
            ChromaDB's metadata, use that match directly and skip
            hybrid retrieval entirely. Otherwise fall through to step 3
            exactly as before.
-        3. Hybrid retrieval over ChromaDB + BM25.       -> hybrid_search()
-        4. Rerank the candidates.                       -> rerank()
-        5. Build the final LLM prompt.                  -> build_prompt()
-        6. Generate the answer.                         -> generate_answer()
-        7. Return the answer + sources as JSON.
+        3. NEW: exact BOQ-item fast path.               -> get_chunk_by_boq_item_no()
+           Only runs if step 2 found nothing. If the query names a BOQ
+           item identifier found verbatim in ChromaDB's metadata (`parent`,
+           `s_no`, `item_header_no`, or `section_no`), use that match
+           directly and skip hybrid retrieval entirely. Otherwise fall
+           through to step 4 exactly as before.
+        4. Hybrid retrieval over ChromaDB + BM25.       -> hybrid_search()
+        5. Rerank the candidates.                       -> rerank()
+        6. Build the final LLM prompt.                  -> build_prompt()
+        7. Generate the answer.                         -> generate_answer()
+        8. Return the answer + sources as JSON.
     """
     query_text = request.query.strip()
     if not query_text:
@@ -489,18 +496,50 @@ def ask(request: QueryRequest) -> AnswerResponse:
                     candidates.append(entry)
                     already_ids.add(child["chunk_id"])
 
-    # BUGFIX: track whether `candidates` came from the exact-metadata
-    # match, not from hybrid_search()/rerank(). An exact clause_no hit
-    # is already the highest-confidence result possible (score=1.0, set
-    # in get_chunk_by_clause_no) -- running it through the cross-encoder
+    # ----------------------------------------------------------------
+    # NEW: Exact BOQ-item fast path (see query.py's
+    # extract_boq_item_no()/get_chunk_by_boq_item_no() docstrings for
+    # the full rationale). Same problem as the clause fast path above,
+    # for Bill-of-Quantities rows instead of clauses: dense + BM25 rank
+    # on chunk TEXT, not on the `parent`/`s_no`/`item_header_no`/
+    # `section_no` metadata fields, so an exact BOQ reference like
+    # "Describe BOQ item 1.02.E.2" can still fail to surface the
+    # correct item(s) first. Checking metadata directly for an exact
+    # match up front fixes that without touching embeddings, BM25, or
+    # the merge logic.
+    #
+    # Only attempted if the clause fast path above found nothing --
+    # a query that already resolved via an exact clause match is a
+    # clause query, not a BOQ query, and should not also be run through
+    # the BOQ lookup. `candidates` is deliberately left empty (rather
+    # than raising) on a BOQ-lookup failure or "identifier named but
+    # not found in the corpus" -- either case just means we fall
+    # through to the existing hybrid_search() pipeline below, unchanged.
+    # ----------------------------------------------------------------
+    if not candidates:
+        boq_item_no = extract_boq_item_no(query_text)
+        if boq_item_no:
+            try:
+                candidates = get_chunk_by_boq_item_no(boq_item_no)
+            except Exception:
+                logger.exception(
+                    "Exact BOQ item lookup failed for item_no: %r", boq_item_no
+                )
+                candidates = []
+
+    # BUGFIX: track whether `candidates` came from an exact-metadata
+    # match (clause OR BOQ), not from hybrid_search()/rerank(). An exact
+    # clause_no or BOQ-item hit is already the highest-confidence result
+    # possible (score=1.0, set in get_chunk_by_clause_no /
+    # get_chunk_by_boq_item_no) -- running it through the cross-encoder
     # anyway wastes a GPU call AND overwrites that confidence with a
     # near-zero raw reranker_score (the model is scoring one full
-    # question against one short clause in isolation, which legitimately
+    # question against one short chunk in isolation, which legitimately
     # produces tiny logits -- observed 0.0011/0.0022 in testing). That
     # score then leaks into the API response's `sources[].reranker_score`
-    # with nothing in the payload to explain it, making an exact clause
-    # match look like ~0.1% confidence to any caller. Skip reranking
-    # entirely on this path instead.
+    # with nothing in the payload to explain it, making an exact match
+    # look like ~0.1% confidence to any caller. Skip reranking entirely
+    # on this path instead.
     exact_match = bool(candidates)
 
     if not exact_match:
