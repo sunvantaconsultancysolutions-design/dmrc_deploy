@@ -65,6 +65,7 @@ from .prompt_engineering import (
     get_boq_page_number,
     get_document_name,
     has_usable_context,
+    wants_detailed_answer,
 )
 from .query import get_model as get_dense_model
 from .query import extract_clause_no, get_chunk_by_clause_no, get_chunks_by_parent_clause
@@ -73,7 +74,20 @@ from .reranker import evaluate_confidence, expand_with_siblings, get_reranker_mo
 from . import query as query_module
 from . import reranker as reranker_module
 from .gemma_inference import generate_answer, get_gemma_model
+from .gemma_inference import MAX_NEW_TOKENS as DETAILED_MAX_NEW_TOKENS
 from . import gemma_inference as gemma_module
+
+# Demo-day performance change: most questions now get the concise
+# (5-8 bullet, ~150-250 word) instructions from prompt_engineering.py,
+# which need far fewer generated tokens than the original long-form
+# answers -- generation cost scales with tokens actually produced, so
+# capping this lower directly cuts response latency for the common
+# case. wants_detailed_answer() switches both the instructions AND this
+# cap back to the full DETAILED_MAX_NEW_TOKENS whenever the user's own
+# wording asks for a fuller answer. Overridable via GEMMA_CONCISE_MAX_NEW_TOKENS
+# the same way MAX_NEW_TOKENS itself is overridable, for easy tuning
+# without a code change.
+CONCISE_MAX_NEW_TOKENS = int(os.environ.get("GEMMA_CONCISE_MAX_NEW_TOKENS", "512"))
 
 logger = logging.getLogger("dmrc_rag.api")
 
@@ -682,6 +696,18 @@ def ask(request: QueryRequest) -> AnswerResponse:
     if not has_usable_context(reranked):
         return AnswerResponse(answer=NO_CONTEXT_ANSWER, sources=[], confidence=None)
 
+    # Demo-day change: default every answer to the concise (5-8 bullet,
+    # ~150-250 word) instructions and a lower generation cap, unless the
+    # user's own wording asks for a fuller answer (see
+    # wants_detailed_answer() in prompt_engineering.py). Decided once
+    # here so the same flag drives both the INSTRUCTIONS block baked
+    # into the prompt and the max_new_tokens cap handed to Gemma below --
+    # keeping them in sync is what lets the concise cap actually shorten
+    # generation instead of just truncating a prompt still asking for a
+    # long answer.
+    detailed = wants_detailed_answer(query_text)
+    gen_max_new_tokens = DETAILED_MAX_NEW_TOKENS if detailed else CONCISE_MAX_NEW_TOKENS
+
     try:
         # build_prompt_with_context() applies token budgeting on top of
         # retrieval_caps.py's chunk-count cap (see prompt_engineering.py's
@@ -689,7 +715,13 @@ def ask(request: QueryRequest) -> AnswerResponse:
         # kept alongside the prompt, so `reranked` -- used below for both
         # sources and confidence -- always matches what was actually sent
         # to Gemma, even on the rare query where budgeting trims it further.
-        prompt, reranked = build_prompt_with_context(query_text, reranked)
+        # max_new_tokens is passed through so the token-budget check
+        # reserves exactly the generation headroom that will actually be
+        # used (see fit_context_to_budget()), and detailed keeps the
+        # INSTRUCTIONS block in sync with gen_max_new_tokens above.
+        prompt, reranked = build_prompt_with_context(
+            query_text, reranked, max_new_tokens=gen_max_new_tokens, detailed=detailed,
+        )
     except Exception as exc:
         logger.error(
             "Prompt construction failed for query: %r",
@@ -702,7 +734,7 @@ def ask(request: QueryRequest) -> AnswerResponse:
         ) from exc
 
     try:
-        answer = generate_answer(prompt)
+        answer = generate_answer(prompt, max_new_tokens=gen_max_new_tokens)
     except Exception as exc:
         logger.error(
             "Gemma inference failed for query: %r",

@@ -4,11 +4,26 @@ import ChatInput from "./components/ChatInput.jsx";
 import StatusBadge from "./components/StatusBadge.jsx";
 import { askQuestion } from "./api.js";
 
-const SUGGESTIONS = [
-  "What are the contractor's obligations?",
-  "Who is responsible for maintenance during the defects liability period?",
-  "Which stations are covered under this contract?",
-  "What training must the contractor provide to employer staff?",
+// TASK 1 -- Home-screen suggested questions, grouped by document type.
+// Deliberately phrased with no clause numbers or BOQ item numbers (demo
+// users don't know document identifiers) -- see task instructions.
+const SUGGESTION_GROUPS = [
+  {
+    icon: "📄",
+    label: "Contract Clauses",
+    questions: [
+      "What are the contractor's obligations?",
+      "Who is responsible for maintenance during the defects liability period?",
+    ],
+  },
+  {
+    icon: "📋",
+    label: "Bill of Quantities (BOQ)",
+    questions: [
+      "What is included in the Digital Ammeter?",
+      "What is the overall tender amount?",
+    ],
+  },
 ];
 
 export default function App() {
@@ -114,13 +129,20 @@ export default function App() {
             </div>
 
             <p className="section-label">Try asking</p>
-            <div className="suggestion-grid">
-              {SUGGESTIONS.map((s) => (
-                <button key={s} onClick={() => handleSend(s)} className="suggestion-card">
-                  {s}
-                </button>
-              ))}
-            </div>
+            {SUGGESTION_GROUPS.map((group) => (
+              <div className="suggestion-group" key={group.label}>
+                <p className="suggestion-group__label">
+                  <span aria-hidden="true">{group.icon}</span> {group.label.toUpperCase()}
+                </p>
+                <div className="suggestion-grid">
+                  {group.questions.map((s) => (
+                    <button key={s} onClick={() => handleSend(s)} className="suggestion-card">
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <div className="msg-list">

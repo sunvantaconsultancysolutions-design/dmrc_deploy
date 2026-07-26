@@ -68,6 +68,53 @@ If more than one block is relevant to the question, combine all relevant clauses
 Never use information that is not present in the supplied context, and never hallucinate details not stated there."""
 
 
+# ---------------------------------------------------------------------------
+# Response length modes (demo-day change): most questions should get a
+# short, scannable answer instead of a multi-paragraph essay -- both for
+# generation latency (fewer tokens to generate) and for readability in the
+# chat UI. A caller can still ask for the long-form version explicitly (see
+# wants_detailed_answer() below), which switches back to the original
+# RESPONSE_INSTRUCTIONS above unchanged.
+#
+# This only changes the INSTRUCTIONS section of the prompt -- retrieval,
+# reranking, confidence gating, and context formatting are untouched, so
+# the model still sees exactly the same evidence either way; only how much
+# of it to write back out changes.
+# ---------------------------------------------------------------------------
+
+CONCISE_RESPONSE_INSTRUCTIONS = """Use only the supplied context. Do not assume missing information.
+Answer in 5 to 8 short bullet points, targeting roughly 150-250 words in total.
+Keep only the most relevant information -- do not restate or copy large sections of the contract text verbatim.
+Quote exact values whenever possible (quantities, penalties, durations, thresholds, rates, amounts).
+Cite the Clause Number, Page Number, and/or BOQ Item Number (whichever is available) inline for each bullet.
+Review every retrieved context block below, not just the first one, and combine all relevant blocks into one answer.
+If the supplied context (clause or BOQ) directly addresses the question -- including equipment, components, specifications, quantities, rates, or amounts -- answer from it directly; do not fall back to a refusal just because the answer takes synthesis across a few fields.
+Only say the information is unavailable if the supplied context truly does not address the question.
+Never use information that is not present in the supplied context, and never hallucinate details not stated there."""
+
+
+DETAIL_REQUEST_KEYWORDS = (
+    "detail", "detailed", "elaborate", "elaborated", "in depth", "in-depth",
+    "comprehensive", "full explanation", "explain fully", "explain in full",
+    "everything about", "complete breakdown", "long answer", "at length",
+    "step by step", "step-by-step", "thorough",
+)
+
+
+def wants_detailed_answer(query: str) -> bool:
+    """True if the user's own wording is explicitly asking for a longer,
+    fuller answer than the default concise mode -- e.g. "explain in
+    detail", "give me a thorough breakdown". Used by app.py to pick
+    between CONCISE_RESPONSE_INSTRUCTIONS (default) and the original
+    RESPONSE_INSTRUCTIONS (opt-in, unabridged), per the "if the user
+    explicitly asks for detailed information, provide a detailed answer"
+    requirement. Pure keyword check on the query text -- no extra model
+    call, so it costs nothing on the latency path this exists to shorten.
+    """
+    lowered = query.lower()
+    return any(keyword in lowered for keyword in DETAIL_REQUEST_KEYWORDS)
+
+
 ANSWER_SECTION_HEADER = "ANSWER"
 
 
@@ -312,7 +359,12 @@ def _section(header: str, body: str) -> str:
     return f"{_SEPARATOR}\n{header}\n{_SEPARATOR}\n{body}"
 
 
-def _assemble_prompt(query: str, candidates: List[Dict[str, Any]], use_few_shot: bool = False) -> str:
+def _assemble_prompt(
+    query: str,
+    candidates: List[Dict[str, Any]],
+    use_few_shot: bool = False,
+    detailed: bool = False,
+) -> str:
     """The actual Chapter 11.9/11.10 prompt-assembly logic: query +
     candidates in, final prompt string out. No budget checking here --
     this always renders every candidate it is given. Kept private; call
@@ -322,6 +374,11 @@ def _assemble_prompt(query: str, candidates: List[Dict[str, Any]], use_few_shot:
     fit_context_to_budget() can call it repeatedly (once per
     candidate-list length it tries) without any budget-vs-render
     recursion.
+
+    detailed selects which INSTRUCTIONS block is used: False (default)
+    -> CONCISE_RESPONSE_INSTRUCTIONS (5-8 bullets, ~150-250 words), True
+    -> the original, unabridged RESPONSE_INSTRUCTIONS. See
+    wants_detailed_answer() for how callers decide which to pass.
     """
     deduped = deduplicate_candidates(candidates)
     context_block = format_context(deduped) or NO_CANDIDATES_CONTEXT_PLACEHOLDER
@@ -333,7 +390,8 @@ def _assemble_prompt(query: str, candidates: List[Dict[str, Any]], use_few_shot:
 
     sections.append(_section("CONTEXT", context_block))
     sections.append(_section("QUESTION", query.strip()))
-    sections.append(_section("INSTRUCTIONS", RESPONSE_INSTRUCTIONS))
+    instructions = RESPONSE_INSTRUCTIONS if detailed else CONCISE_RESPONSE_INSTRUCTIONS
+    sections.append(_section("INSTRUCTIONS", instructions))
     sections.append(f"{_SEPARATOR}\n{ANSWER_SECTION_HEADER}\n{_SEPARATOR}")
 
     return "\n\n".join(sections)
@@ -384,6 +442,7 @@ def fit_context_to_budget(
     candidates: List[Dict[str, Any]],
     max_new_tokens: Optional[int] = None,
     use_few_shot: bool = False,
+    detailed: bool = False,
 ) -> List[Dict[str, Any]]:
     """Trims `candidates` -- already reranker-ordered, highest-ranked
     first -- so the prompt _assemble_prompt() would build from them, plus
@@ -416,7 +475,7 @@ def fit_context_to_budget(
     # once, rather than skipping straight past the fit check to the
     # "still overflows with zero chunks" branch below.
     while True:
-        prompt = _assemble_prompt(query, kept, use_few_shot=use_few_shot)
+        prompt = _assemble_prompt(query, kept, use_few_shot=use_few_shot, detailed=detailed)
         n_tokens = _count_tokens(prompt)
 
         if n_tokens <= budget:
@@ -460,6 +519,7 @@ def build_prompt_with_context(
     candidates: List[Dict[str, Any]],
     use_few_shot: bool = False,
     max_new_tokens: Optional[int] = None,
+    detailed: Optional[bool] = None,
 ) -> Tuple[str, List[Dict[str, Any]]]:
     """Same as build_prompt() below, but also returns the (possibly
     token-budget-trimmed) candidate list that was actually rendered into
@@ -468,11 +528,22 @@ def build_prompt_with_context(
     can keep those in sync with what the model actually saw, even on the
     rare query where token budgeting trims the list app.py otherwise
     received from reranking/expansion.
+
+    detailed selects the INSTRUCTIONS block (see _assemble_prompt). If
+    left as None (the default, e.g. for any caller that hasn't been
+    updated), it is derived from the query text itself via
+    wants_detailed_answer() so old call sites keep working without
+    change -- passing it explicitly (as app.py's /ask endpoint does) just
+    skips re-deriving it from a query the caller may have already
+    inspected.
     """
+    if detailed is None:
+        detailed = wants_detailed_answer(query)
     kept = fit_context_to_budget(
         query, candidates, max_new_tokens=max_new_tokens, use_few_shot=use_few_shot,
+        detailed=detailed,
     )
-    return _assemble_prompt(query, kept, use_few_shot=use_few_shot), kept
+    return _assemble_prompt(query, kept, use_few_shot=use_few_shot, detailed=detailed), kept
 
 
 def build_prompt(query: str, candidates: List[Dict[str, Any]], use_few_shot: bool = False) -> str:

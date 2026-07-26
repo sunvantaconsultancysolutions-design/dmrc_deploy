@@ -254,6 +254,26 @@ button {
   background: var(--line);
 }
 
+/* TASK 1 -- groups suggestion cards under a "📄 CONTRACT CLAUSES" /
+   "📋 BILL OF QUANTITIES (BOQ)" heading. Reuses .suggestion-grid /
+   .suggestion-card as-is; only adds the group label + spacing between
+   groups, matching the existing .section-label mono/uppercase treatment. */
+.suggestion-group {
+  margin-bottom: 16px;
+}
+
+.suggestion-group:last-child {
+  margin-bottom: 0;
+}
+
+.suggestion-group__label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--slate);
+  margin: 0 0 8px;
+}
+
 .suggestion-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

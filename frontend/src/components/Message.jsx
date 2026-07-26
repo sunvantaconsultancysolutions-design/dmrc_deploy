@@ -1,36 +1,13 @@
-import SourceChip from "./SourceChip.jsx";
+// TASK 2 -- retrieved source cards removed from the UI (per manager
+// request). The backend is untouched: /ask still runs full retrieval
+// and still returns `sources`/`chunk_type` on every response exactly as
+// before (see src/app.py's SourceItem / _build_sources()) -- this
+// component simply no longer renders that data. SourceChip and the old
+// buildGroundedLabel()/"Grounded in N Retrieved ..." formatting are no
+// longer used here; SourceChip.jsx is left in place, unmodified, in
+// case the source-card UI is reinstated later.
 
-// TASK 3 -- UI retrieval label fix.
-//
-// Previously this component always rendered "Grounded in N retrieved
-// clause(s)", even when every retrieved chunk was actually a BOQ item
-// (or a mix of both) -- misleading for any BOQ-only or mixed answer.
-// The backend now sends each source's real `chunk_type` ("clause" or
-// "boq", from metadata.get("chunk_type"); see src/app.py's SourceItem /
-// _build_sources()). This derives the label from that metadata instead
-// of hardcoding "clauses", per the task's instruction not to hardcode
-// the wording.
-function buildGroundedLabel(sources) {
-  const count = sources.length;
-  const types = new Set(sources.map((s) => s.chunk_type).filter(Boolean));
-
-  if (types.size === 1) {
-    const [onlyType] = types;
-    if (onlyType === "boq") {
-      return `Grounded in ${count} Retrieved BOQ ${count === 1 ? "Item" : "Items"}`;
-    }
-    if (onlyType === "clause") {
-      return `Grounded in ${count} Retrieved ${count === 1 ? "Clause" : "Clauses"}`;
-    }
-  }
-
-  // Mixed chunk types, or chunk_type missing on some/all sources (older
-  // backend response shape) -- fall back to a neutral, always-accurate
-  // label rather than guessing.
-  return `Grounded in ${count} Retrieved ${count === 1 ? "Document" : "Documents"}`;
-}
-
-export default function Message({ role, content, sources, isError, isLoading }) {
+export default function Message({ role, content, isError, isLoading }) {
   const isUser = role === "user";
 
   return (
@@ -51,17 +28,6 @@ export default function Message({ role, content, sources, isError, isLoading }) 
             <p>{content}</p>
           )}
         </div>
-
-        {!isUser && sources && sources.length > 0 && (
-          <div className="sources-rail">
-            <span className="sources-rail__label">{buildGroundedLabel(sources)}</span>
-            <div className="sources-rail__track">
-              {sources.map((s, i) => (
-                <SourceChip key={s.chunk_id || i} source={s} />
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
