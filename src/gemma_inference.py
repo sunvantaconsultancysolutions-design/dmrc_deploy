@@ -93,6 +93,13 @@ logger = logging.getLogger("dmrc_rag.gemma_inference")
 
 MODEL_NAME = "google/gemma-2-9b-it"
 
+# google/gemma-2-9b-it's trained context length (its config.json
+# max_position_embeddings). Single source of truth for token budgeting --
+# prompt_engineering.fit_context_to_budget() imports this constant rather
+# than hardcoding its own copy, so the two stay in sync if the model is
+# ever swapped for one with a different context window.
+MODEL_CONTEXT_WINDOW_TOKENS = 8192
+
 # 12.6 Generation defaults. Greedy decoding (do_sample=False) is used
 # for reproducible, low-variance answers over contract/engineering
 # text, where consistency matters more than creative variation.
@@ -153,6 +160,30 @@ def _select_device() -> str:
     return "cpu"
 
 
+def get_tokenizer() -> AutoTokenizer:
+    """Lazily load (and cache) just the Gemma 2 tokenizer, without pulling
+    in the 9B-parameter model weights.
+
+    Shares the same module-level `_tokenizer` cache as get_gemma_model():
+      - If the model has already been warmed up (the FastAPI lifespan
+        hook, or a prior request), this returns that exact same tokenizer
+        instance for free -- no reload.
+      - Otherwise this loads only the tokenizer (small, fast, CPU-only),
+        so a caller that only needs to COUNT tokens -- see
+        prompt_engineering.fit_context_to_budget() -- never pays the full
+        ~18GB model-load cost just to do that.
+
+    get_gemma_model() below calls this instead of loading the tokenizer
+    inline, so there remains exactly one tokenizer-loading code path.
+    """
+    global _tokenizer
+    if _tokenizer is not None:
+        return _tokenizer
+    logger.info("Loading Gemma 2 tokenizer: %s", MODEL_NAME)
+    _tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    return _tokenizer
+
+
 def get_gemma_model() -> Tuple[AutoModelForCausalLM, AutoTokenizer, str]:
     """Initialize (on first call) and return the cached
     (model, tokenizer, device) triple.
@@ -172,8 +203,7 @@ def get_gemma_model() -> Tuple[AutoModelForCausalLM, AutoTokenizer, str]:
 
     _device = _select_device()
 
-    logger.info("Loading Gemma 2 tokenizer: %s", MODEL_NAME)
-    _tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    _tokenizer = get_tokenizer()
 
     # bfloat16 on GPU keeps memory/latency reasonable for a 9B model;
     # on CPU we let PyTorch pick a safe default float dtype instead,

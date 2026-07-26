@@ -60,7 +60,7 @@ from .bm25_index import rebuild_bm25_index
 from .hybrid_retriever import hybrid_search
 from .prompt_engineering import (
     NO_CONTEXT_ANSWER,
-    build_prompt,
+    build_prompt_with_context,
     get_boq_item_number,
     get_boq_page_number,
     get_document_name,
@@ -597,7 +597,13 @@ def ask(request: QueryRequest) -> AnswerResponse:
         return AnswerResponse(answer=NO_CONTEXT_ANSWER, sources=[], confidence=None)
 
     try:
-        prompt = build_prompt(query_text, reranked)
+        # build_prompt_with_context() applies token budgeting on top of
+        # retrieval_caps.py's chunk-count cap (see prompt_engineering.py's
+        # fit_context_to_budget()) and returns the candidates it actually
+        # kept alongside the prompt, so `reranked` -- used below for both
+        # sources and confidence -- always matches what was actually sent
+        # to Gemma, even on the rare query where budgeting trims it further.
+        prompt, reranked = build_prompt_with_context(query_text, reranked)
     except Exception as exc:
         logger.error(
             "Prompt construction failed for query: %r",

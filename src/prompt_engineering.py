@@ -22,8 +22,18 @@ The assembled prompt has five parts, each implemented below:
     5. Output Format         -> ANSWER_SECTION_HEADER (model completes from here)
 """
 
+import logging
+import os
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+
+logger = logging.getLogger("dmrc_rag.prompt_engineering")
+
+# Mirrors the RAG_DEBUG pattern already used by app.py, hybrid_retriever.py,
+# and reranker.py: off by default (production-safe), each stage reads the
+# same env var independently and logs itself right where its own output is
+# computed.
+RAG_DEBUG = os.environ.get("RAG_DEBUG", "0") == "1"
 
 # ---------------------------------------------------------------------------
 # 11.5 System Prompt
@@ -302,25 +312,16 @@ def _section(header: str, body: str) -> str:
     return f"{_SEPARATOR}\n{header}\n{_SEPARATOR}\n{body}"
 
 
-def build_prompt(query: str, candidates: List[Dict[str, Any]], use_few_shot: bool = False) -> str:
-    """Assembles the full Gemma 3 prompt from a user query and the
-    merged retrieval candidates, following the Chapter 11.10 workflow:
-
-        1. Receive top-ranked documents.      (candidates, as passed in)
-        2. Remove duplicate chunks.            -> deduplicate_candidates()
-        3. Merge document context.             -> format_context()
-        4. Insert metadata.                    -> done inside format_context()
-        5. Insert user query.                  -> below
-        6. Generate final prompt.              -> return value
-        7. Send prompt to Gemma 3.             -> generate_answer.py
-
-    use_few_shot defaults to False (11.11: few-shot prompting is
-    optional) so the single example doesn't eat into the retrieved
-    context's token budget unless explicitly requested.
-
-    Returns the complete prompt string, ending right after the "ANSWER"
-    header so the model's own generation is the completion of the
-    template shown in 11.9.
+def _assemble_prompt(query: str, candidates: List[Dict[str, Any]], use_few_shot: bool = False) -> str:
+    """The actual Chapter 11.9/11.10 prompt-assembly logic: query +
+    candidates in, final prompt string out. No budget checking here --
+    this always renders every candidate it is given. Kept private; call
+    build_prompt() or build_prompt_with_context() instead, both of which
+    apply token budgeting (see fit_context_to_budget() below) before this
+    ever runs. This stays a pure, unbounded renderer so
+    fit_context_to_budget() can call it repeatedly (once per
+    candidate-list length it tries) without any budget-vs-render
+    recursion.
     """
     deduped = deduplicate_candidates(candidates)
     context_block = format_context(deduped) or NO_CANDIDATES_CONTEXT_PLACEHOLDER
@@ -336,6 +337,173 @@ def build_prompt(query: str, candidates: List[Dict[str, Any]], use_few_shot: boo
     sections.append(f"{_SEPARATOR}\n{ANSWER_SECTION_HEADER}\n{_SEPARATOR}")
 
     return "\n\n".join(sections)
+
+
+# ---------------------------------------------------------------------------
+# Token budgeting
+#
+# retrieval_caps.py bounds how many CHUNKS reach here; it says nothing
+# about how many TOKENS those chunks cost once assembled into a prompt.
+# A handful of long BOQ rows or clause blocks can still overflow Gemma 2
+# 9B's context window even at a capped chunk count. This bounds the
+# assembled prompt (context + system/instructions/question overhead) so
+# that, together with the tokens reserved for generation, the total never
+# exceeds gemma_inference.MODEL_CONTEXT_WINDOW_TOKENS.
+#
+# Reuses the exact tokenizer generate_answer() uses for the real call
+# (gemma_inference.get_tokenizer()) -- no second tokenizer is loaded, and
+# get_tokenizer() only loads the tokenizer itself, not the 9B model, so
+# this stays cheap even if the model hasn't been warmed up yet.
+# ---------------------------------------------------------------------------
+
+# apply_chat_template() wraps the raw prompt string with a handful of
+# control tokens at generation time (<bos>, <start_of_turn>user, the
+# trailing <start_of_turn>model, etc.) that a plain tokenizer.encode() of
+# the prompt text alone does not include. This fixed headroom absorbs that
+# difference so the budget check is a real upper bound, not an estimate
+# that generate_answer() could still exceed by a few tokens.
+CHAT_TEMPLATE_TOKEN_OVERHEAD = 16
+
+
+def _count_tokens(text: str) -> int:
+    """Tokenizes `text` with the same tokenizer generate_answer() uses, so
+    this count matches what actually reaches the model.
+    add_special_tokens=False because this measures the raw prompt text's
+    token cost, not a chat-template-wrapped sequence -- see
+    CHAT_TEMPLATE_TOKEN_OVERHEAD above for that wrapping's cost instead.
+    """
+    from .gemma_inference import get_tokenizer  # local import: avoids importing
+                                                  # transformers/torch at module
+                                                  # load for callers that only need
+                                                  # pure prompt construction.
+    return len(get_tokenizer().encode(text, add_special_tokens=False))
+
+
+def fit_context_to_budget(
+    query: str,
+    candidates: List[Dict[str, Any]],
+    max_new_tokens: Optional[int] = None,
+    use_few_shot: bool = False,
+) -> List[Dict[str, Any]]:
+    """Trims `candidates` -- already reranker-ordered, highest-ranked
+    first -- so the prompt _assemble_prompt() would build from them, plus
+    the tokens reserved for generation, fits inside
+    gemma_inference.MODEL_CONTEXT_WINDOW_TOKENS.
+
+    Chunks are dropped ONE AT A TIME FROM THE END of the list (i.e. the
+    lowest-ranked survivor goes first) until the assembled prompt fits the
+    budget. This never reorders or drops a higher-ranked chunk ahead of a
+    lower-ranked one that survives -- it only ever shortens the list from
+    the tail, so reranker order is preserved exactly among whatever
+    remains.
+
+    Small prompts (the common case) exit on the first iteration -- one
+    token count, no trimming -- so this adds one tokenizer call and no
+    behavior change for any prompt that already fit.
+    """
+    if max_new_tokens is None:
+        from .gemma_inference import MAX_NEW_TOKENS as max_new_tokens
+    from .gemma_inference import MODEL_CONTEXT_WINDOW_TOKENS
+
+    reserved = max_new_tokens + CHAT_TEMPLATE_TOKEN_OVERHEAD
+    budget = MODEL_CONTEXT_WINDOW_TOKENS - reserved
+
+    kept = deduplicate_candidates(candidates)
+    original_count = len(kept)
+
+    # Check-then-loop (not `while kept:`) so an already-empty candidate
+    # list (e.g. a genuine empty-retrieval query) still gets evaluated
+    # once, rather than skipping straight past the fit check to the
+    # "still overflows with zero chunks" branch below.
+    while True:
+        prompt = _assemble_prompt(query, kept, use_few_shot=use_few_shot)
+        n_tokens = _count_tokens(prompt)
+
+        if n_tokens <= budget:
+            if RAG_DEBUG:
+                logger.info(
+                    "[token-budget] query=%r kept=%d/%d chunks, prompt=%d tok "
+                    "(budget=%d, reserved_for_generation=%d, window=%d)",
+                    query, len(kept), original_count, n_tokens, budget,
+                    reserved, MODEL_CONTEXT_WINDOW_TOKENS,
+                )
+            return kept
+
+        if not kept:
+            # Even the system prompt + instructions + question alone (zero
+            # retrieved context) exceeds the budget. Extremely unlikely --
+            # that's a few hundred tokens against an 8192-token window --
+            # but handled rather than assumed away: _assemble_prompt()
+            # already renders this exactly like a genuine empty-retrieval
+            # result (via NO_CANDIDATES_CONTEXT_PLACEHOLDER); log it as a
+            # real overflow rather than silently returning.
+            logger.warning(
+                "[token-budget] query=%r: prompt=%d tok exceeds budget=%d "
+                "even with zero retrieved chunks; proceeding with no "
+                "context anyway (nothing left to trim).",
+                query, n_tokens, budget,
+            )
+            return kept
+
+        if RAG_DEBUG:
+            dropped = kept[-1]
+            logger.info(
+                "[token-budget] prompt=%d tok exceeds budget=%d -- dropping "
+                "lowest-ranked surviving chunk chunk_id=%r reranker_score=%s",
+                n_tokens, budget, dropped.get("chunk_id"), dropped.get("reranker_score"),
+            )
+        kept = kept[:-1]
+
+
+def build_prompt_with_context(
+    query: str,
+    candidates: List[Dict[str, Any]],
+    use_few_shot: bool = False,
+    max_new_tokens: Optional[int] = None,
+) -> Tuple[str, List[Dict[str, Any]]]:
+    """Same as build_prompt() below, but also returns the (possibly
+    token-budget-trimmed) candidate list that was actually rendered into
+    the prompt, so a caller building citations/sources from "the
+    candidates that grounded this answer" -- see app.py's /ask endpoint --
+    can keep those in sync with what the model actually saw, even on the
+    rare query where token budgeting trims the list app.py otherwise
+    received from reranking/expansion.
+    """
+    kept = fit_context_to_budget(
+        query, candidates, max_new_tokens=max_new_tokens, use_few_shot=use_few_shot,
+    )
+    return _assemble_prompt(query, kept, use_few_shot=use_few_shot), kept
+
+
+def build_prompt(query: str, candidates: List[Dict[str, Any]], use_few_shot: bool = False) -> str:
+    """Assembles the full Gemma prompt from a user query and the merged
+    retrieval candidates, following the Chapter 11.10 workflow:
+
+        1. Receive top-ranked documents.      (candidates, as passed in)
+        2. Remove duplicate chunks.            -> deduplicate_candidates()
+        3. Fit the token budget.               -> fit_context_to_budget()
+        4. Merge document context.             -> format_context()
+        5. Insert metadata.                    -> done inside format_context()
+        6. Insert user query.                  -> below
+        7. Generate final prompt.              -> return value
+        8. Send prompt to Gemma.               -> generate_answer.py
+
+    use_few_shot defaults to False (11.11: few-shot prompting is
+    optional) so the single example doesn't eat into the retrieved
+    context's token budget unless explicitly requested.
+
+    Returns the complete prompt string, ending right after the "ANSWER"
+    header so the model's own generation is the completion of the
+    template shown in 11.9. The prompt this returns is guaranteed to fit
+    gemma_inference.MODEL_CONTEXT_WINDOW_TOKENS together with the tokens
+    reserved for generation (see fit_context_to_budget()). Callers that
+    also need to know which candidates survived that fit (e.g. to keep
+    API source citations in sync) should call build_prompt_with_context()
+    instead; this is a thin wrapper around it for callers that only need
+    the prompt string, matching this function's original signature.
+    """
+    prompt, _kept = build_prompt_with_context(query, candidates, use_few_shot=use_few_shot)
+    return prompt
 
 
 # ---------------------------------------------------------------------------
