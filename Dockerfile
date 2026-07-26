@@ -13,9 +13,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
 ENV HF_TOKEN=""
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        python3.11 python3.11-venv python3.11-dev git curl \
+        python3.11 python3.11-venv python3.11-dev python3-pip git curl \
     && rm -rf /var/lib/apt/lists/* \
-    && python3.11 -m ensurepip --upgrade \
     && python3.11 -m pip install --upgrade pip \
     && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 
