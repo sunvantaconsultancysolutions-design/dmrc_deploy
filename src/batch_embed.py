@@ -8,7 +8,26 @@ Batch encoding of clause chunks using BGE-M3. Covers Chapter 7.10
 from sentence_transformers import SentenceTransformer
 
 MODEL_NAME = "BAAI/bge-m3"
-model = SentenceTransformer(MODEL_NAME)
+
+# The model is NOT loaded at import time. It is created lazily, on first
+# use, via get_model() below, and cached for the lifetime of the process
+# so subsequent calls reuse the same instance instead of reloading it.
+_model = None
+
+
+def get_model() -> SentenceTransformer:
+    """Return the shared BGE-M3 model instance, loading it on first call.
+
+    Loading downloads (or reads from the local HF cache) the ~2.27GB
+    BGE-M3 checkpoint and initializes it on GPU if available, else CPU.
+    This happens once per process -- the loaded instance is cached in
+    the module-level `_model` variable and reused by every subsequent
+    call to embed_batch() (and by other modules that import get_model).
+    """
+    global _model
+    if _model is None:
+        _model = SentenceTransformer(MODEL_NAME)
+    return _model
 
 
 def embed_batch(texts: list, batch_size: int = 32):
@@ -20,6 +39,7 @@ def embed_batch(texts: list, batch_size: int = 32):
     instead of one 1xD vector at a time -- this is the dominant factor
     in throughput for transformer encoders.
     """
+    model = get_model()
     embeddings = model.encode(
         texts,
         batch_size=batch_size,

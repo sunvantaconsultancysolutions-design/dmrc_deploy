@@ -58,7 +58,7 @@ a drop-in replacement for Chapter 9's output when handed to Chapter
 import argparse
 import os
 import statistics
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -141,6 +141,27 @@ def _score_pairs(
 
 
 # ---------------------------------------------------------------------------
+# Shared RAG_DEBUG console output, used by both rerank() and
+# expand_with_siblings() below so the two debug blocks can't drift out
+# of sync with each other (previously each inlined its own copy of this
+# same print loop).
+# ---------------------------------------------------------------------------
+
+def _print_debug_block(header: str, candidates: List[Dict[str, Any]], prefix: str = "") -> None:
+    """Prints a 'chunk_id  clause=...  reranker_score=...' line per
+    candidate, under a "==== header ====" banner. `prefix` is prepended
+    to each chunk_id (e.g. "+" in expand_with_siblings(), to visually
+    mark additions). Only ever called when RAG_DEBUG is on.
+    """
+    print("=" * 22)
+    print(header)
+    print("=" * 22)
+    for c in candidates:
+        clause_no = (c.get("metadata") or {}).get("clause_no", "N/A")
+        print(f"  {prefix}{c['chunk_id']}  clause={clause_no}  reranker_score={c['reranker_score']}")
+
+
+# ---------------------------------------------------------------------------
 # 10.4  Reranking Entry Point
 # ---------------------------------------------------------------------------
 
@@ -197,12 +218,7 @@ def rerank(
     reranked = reranked[:top_n]
 
     if RAG_DEBUG:
-        print("=" * 22)
-        print("After Reranker")
-        print("=" * 22)
-        for c in reranked:
-            clause_no = (c.get("metadata") or {}).get("clause_no", "N/A")
-            print(f"  {c['chunk_id']}  clause={clause_no}  reranker_score={c['reranker_score']}")
+        _print_debug_block("After Reranker", reranked)
 
     return reranked
 
@@ -212,13 +228,14 @@ def rerank(
 #
 # Root cause this addresses: has_usable_context() in prompt_engineering.py
 # only checks "is the candidate list non-empty" -- it has no notion of
-# score quality. rerank() always returns its top_n=12 best-of-a-bad-lot
-# candidates even for a completely off-topic query (e.g. "What is
-# Artificial Intelligence?"), so has_usable_context() passes, sources get
-# built and shown in the UI ("Grounded in 16 retrieved clauses"), even
-# though every reranker_score is ~0 and Gemma correctly ignores all of
-# them and answers "not found" anyway. The mismatch is a sources/UI
-# problem, not an LLM problem.
+# score quality. rerank() always returns its configured top_n
+# best-of-a-bad-lot candidates (this module defaults to
+# DEFAULT_TOP_N=10, though callers may pass a different top_n) even for
+# a completely off-topic query (e.g. "What is Artificial Intelligence?"),
+# so has_usable_context() passes, sources get built and shown in the UI
+# ("Grounded in N retrieved clauses"), even though every reranker_score
+# is ~0 and Gemma correctly ignores all of them and answers "not found"
+# anyway. The mismatch is a sources/UI problem, not an LLM problem.
 #
 # Fix: gate on the SCORE DISTRIBUTION of this query's own candidate pool,
 # not a single hand-picked constant:
@@ -231,9 +248,17 @@ def rerank(
 #
 # Calibration note: the two defaults below are a reasonable starting
 # point for BAAI/bge-reranker-v2-m3's sigmoid output, but MUST be
-# re-validated against this corpus's real query logs (see
-# scripts/calibrate_confidence.py) before being trusted in production --
-# override via the env vars rather than editing the constants directly.
+# re-validated against this corpus's real query logs before being
+# trusted in production -- override via the env vars rather than
+# editing the constants directly.
+#
+# TODO: this calibration should be backed by a repeatable script (e.g.
+# a scripts/calibrate_confidence.py that replays real query logs
+# through evaluate_confidence() and reports false-positive/negative
+# rates for candidate MIN_ABSOLUTE_CONFIDENCE / MIN_SEPARATION_MARGIN
+# values). This module review has no visibility into whether such a
+# script already exists elsewhere in the project -- if not, one should
+# be added before these defaults are trusted in production.
 # ---------------------------------------------------------------------------
 
 MIN_ABSOLUTE_CONFIDENCE = float(os.environ.get("RAG_MIN_CONFIDENCE", "0.10"))
@@ -437,12 +462,7 @@ def expand_with_siblings(
     expanded.sort(key=lambda c: c["reranker_score"], reverse=True)
 
     if RAG_DEBUG:
-        print("=" * 22)
-        print("Sibling Expansion")
-        print("=" * 22)
-        for c in additions:
-            clause_no = (c.get("metadata") or {}).get("clause_no", "N/A")
-            print(f"  +{c['chunk_id']}  clause={clause_no}  reranker_score={c['reranker_score']}")
+        _print_debug_block("Sibling Expansion", additions, prefix="+")
 
     return expanded
 

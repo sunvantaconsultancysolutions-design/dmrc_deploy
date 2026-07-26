@@ -48,11 +48,30 @@ COPY chroma_db/ ./chroma_db/
 
 # Retrieval caps (from 02_Gemma_Inference_and_Serving.ipynb, cell "Runtime
 # caps on retrieval breadth") -- kept as env vars, not notebook magic.
-ENV RAG_MAX_CANDIDATES=20 \
-    RAG_MAX_CONTEXT=8 \
+#
+# FIX: RAG_MAX_CANDIDATES / RAG_MAX_CONTEXT were previously hardcoded to
+# the pre-audit values (20 / 8). src/app.py's own retrieval call sites
+# were since widened, following a forensic audit that found clauses
+# ranked 25th/30th were being lost outside the old top_k=20 cutoff:
+# DENSE_TOP_K/BM25_TOP_K -> 30, MERGED_CANDIDATE_POOL -> 60,
+# RERANK_TOP_N -> 12. retrieval_caps.py applies RAG_MAX_CANDIDATES/
+# RAG_MAX_CONTEXT as a ceiling *before* that retrieval code ever runs,
+# so the stale 20/8 values here were silently re-imposing the exact
+# recall bug the app-level fix addressed. Updated to match the current
+# MERGED_CANDIDATE_POOL (60) and RERANK_TOP_N (12) so this image no
+# longer undercuts app.py's own tuned retrieval breadth. Keep these two
+# values in sync with app.py's constants if either changes again.
+#
+# FIX: ALLOWED_ORIGINS="*" removed -- src/app.py already falls back to
+# "*" on its own when this var is unset (its own comment marks that as
+# a local-dev-only default). Hardcoding it here added no behavior, only
+# the risk of an operator mistaking a wide-open CORS default for an
+# intentional production setting. Set ALLOWED_ORIGINS explicitly at
+# `docker run` / deploy time instead.
+ENV RAG_MAX_CANDIDATES=60 \
+    RAG_MAX_CONTEXT=12 \
     GEMMA_USE_4BIT=0 \
-    GEMMA_MAX_NEW_TOKENS=512 \
-    ALLOWED_ORIGINS="*"
+    GEMMA_MAX_NEW_TOKENS=512
 
 EXPOSE 8000
 

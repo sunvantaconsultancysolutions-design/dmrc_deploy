@@ -9,11 +9,22 @@ Covers Chapter 8.9 (Vector Indexing Workflow validation) / 8.12
 deletes any data in the collection.
 """
 
+import sys
+
 from storage import get_collection
 
+# BGE-M3 embeddings are expected to be 1024-dimensional. Kept as a named
+# constant so the check below is self-explanatory and easy to update.
+EXPECTED_EMBEDDING_DIM = 1024
 
-def validate_collection():
-    """Connect to the existing ChromaDB collection and print a summary."""
+
+def validate_collection() -> None:
+    """Connect to the existing ChromaDB collection and print a summary.
+
+    Exits with status 0 on success (including the "empty collection"
+    case, which is a warning rather than a failure) and status 1 if the
+    collection could not be reached or validated.
+    """
     print("=" * 70)
     print("DMRC ChromaDB Collection Validation")
     print("=" * 70)
@@ -23,9 +34,11 @@ def validate_collection():
         collection = get_collection()
     except Exception as exc:  # noqa: BLE001 - surface any connection issue clearly
         print(f"[FAILED] Could not connect to ChromaDB / open collection: {exc}")
-        return
+        sys.exit(1)
 
-    print(f"[OK] Connected to ChromaDB at ./chroma_db")
+    # The actual storage location is owned by storage.get_collection();
+    # we only confirm that a connection was successfully established.
+    print("[OK] Connected to ChromaDB")
     print(f"[OK] Collection opened: '{collection.name}'")
     print(f"     Collection metadata : {collection.metadata}")
 
@@ -36,18 +49,27 @@ def validate_collection():
     if total_vectors == 0:
         print("\n[WARNING] Collection is empty. Nothing further to validate.")
         print("          Run the Chapter 7 embedding pipeline (main.py) first.")
-        return
+        sys.exit(0)
 
     # --- Sample record (read-only) --------------------------------------
-    sample = collection.get(
-        limit=1,
-        include=["documents", "metadatas", "embeddings"],
-    )
+    try:
+        sample = collection.get(
+            limit=1,
+            include=["documents", "metadatas", "embeddings"],
+        )
 
-    sample_id = sample["ids"][0]
-    sample_document = sample["documents"][0]
-    sample_metadata = sample["metadatas"][0]
-    sample_embedding = sample["embeddings"][0]
+        if not sample.get("ids"):
+            print("\n[FAILED] Collection reports a non-zero count but returned no "
+                  "sample records.")
+            sys.exit(1)
+
+        sample_id = sample["ids"][0]
+        sample_document = sample["documents"][0]
+        sample_metadata = sample["metadatas"][0]
+        sample_embedding = sample["embeddings"][0]
+    except Exception as exc:  # noqa: BLE001 - surface any retrieval issue clearly
+        print(f"\n[FAILED] Could not retrieve sample record: {exc}")
+        sys.exit(1)
 
     print("\n" + "-" * 70)
     print("Sample Record")
@@ -59,19 +81,28 @@ def validate_collection():
     print(preview + ("..." if len(sample_document) > 200 else ""))
 
     print("\nSample metadata:")
-    for key, value in sample_metadata.items():
-        print(f"  {key}: {value}")
+    if sample_metadata:
+        for key, value in sample_metadata.items():
+            print(f"  {key}: {value}")
+    else:
+        print("  (no metadata)")
 
-    embedding_dim = len(sample_embedding)
-    print(f"\nSample embedding (first 5 values) : {list(sample_embedding[:5])}")
-    print(f"[OK] Embedding dimension : {embedding_dim}")
+    if sample_embedding is not None and len(sample_embedding) > 0:
+        embedding_dim = len(sample_embedding)
+        print(f"\nSample embedding (first 5 values) : {list(sample_embedding[:5])}")
+        print(f"[OK] Embedding dimension : {embedding_dim}")
 
-    if embedding_dim != 1024:
-        print(f"[WARNING] Expected BGE-M3 dimension 1024, got {embedding_dim}.")
+        if embedding_dim != EXPECTED_EMBEDDING_DIM:
+            print(f"[WARNING] Expected BGE-M3 dimension {EXPECTED_EMBEDDING_DIM}, "
+                  f"got {embedding_dim}.")
+    else:
+        print("\n[WARNING] Sample record has no embedding to inspect.")
 
     print("\n" + "=" * 70)
     print(f"Validation complete. Collection '{collection.name}' is READY for querying.")
     print("=" * 70)
+
+    sys.exit(0)
 
 
 if __name__ == "__main__":

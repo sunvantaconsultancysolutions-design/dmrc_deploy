@@ -11,6 +11,18 @@ import chromadb
 CHROMA_PATH = "./chroma_db"
 COLLECTION_NAME = "dmrc_be12be14_ecs"
 
+# Metadata keys that must remain numeric (float/int) across every record.
+# A missing value for one of these fields is omitted from the stored
+# metadata rather than coerced to a placeholder, so the key never mixes
+# numeric and string types within the collection (which would break
+# Chroma's numeric `where` filters, e.g. $gt / $lt / $gte / $lte).
+NUMERIC_METADATA_FIELDS = {
+    "rate_in_inr",
+    "rate_in_foreign_currency",
+    "amount_in_inr",
+    "amount_in_foreign_currency",
+}
+
 
 def get_collection():
     client = chromadb.PersistentClient(path=CHROMA_PATH)
@@ -27,6 +39,15 @@ def get_collection():
 def sanitize_metadata(metadata: dict) -> dict:
     """Chroma metadata values must be str/int/float/bool -- lists and
     nested objects (e.g. stamps[]) are JSON-encoded to strings.
+
+    None handling:
+      - For known numeric fields (see NUMERIC_METADATA_FIELDS), a None
+        value means "not available" and the key is OMITTED entirely,
+        so the field never mixes numeric and string types across the
+        collection and remains safe for numeric range queries.
+      - For all other fields, None is coerced to "" as before, since an
+        empty string is a reasonable "no value" sentinel for text/
+        categorical metadata.
     """
     import json
     clean = {}
@@ -34,6 +55,10 @@ def sanitize_metadata(metadata: dict) -> dict:
         if isinstance(v, (list, dict)):
             clean[k] = json.dumps(v)
         elif v is None:
+            if k in NUMERIC_METADATA_FIELDS:
+                # Omit rather than store "" -- keeps this field purely
+                # numeric across all records in the collection.
+                continue
             clean[k] = ""
         else:
             clean[k] = v

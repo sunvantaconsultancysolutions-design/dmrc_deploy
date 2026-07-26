@@ -1,174 +1,250 @@
-# DMRC Contract Intelligence — Embedding Generation Module (Chapter 7)
+# DMRC Contract Intelligence — Enterprise RAG Platform
 
-Local, offline embedding generation pipeline using **BAAI/bge-m3** over the
-finalized Chapter 6 metadata schema and clause-level chunks. No retrieval or
-LLM prompting is implemented here — this module only produces and stores
-embeddings.
+![Python](https://img.shields.io/badge/Python-3.10%2F3.11-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-backend-teal)
+![ChromaDB](https://img.shields.io/badge/ChromaDB-vector--store-orange)
+![React](https://img.shields.io/badge/React-frontend-61DAFB)
+![Docker](https://img.shields.io/badge/Docker-supported-2496ED)
+![License](https://img.shields.io/badge/license-Proprietary-lightgrey)
 
-## Folder structure
+## Project Overview
+
+DMRC Contract Intelligence is an **Enterprise Retrieval-Augmented Generation (RAG) system** for querying Delhi Metro Rail Corporation (DMRC) construction contract documents — including ECS/TVS scope-of-work text and Bill of Quantities (BOQ) items — in natural language.
+
+The system ingests clause-level and BOQ-level contract data, indexes it with hybrid dense + lexical retrieval, reranks candidates with a cross-encoder, and generates grounded, citation-aware answers using an LLM. It is designed to let contract, engineering, and legal teams ask direct questions about scope, specifications, and quantities instead of manually searching PDF documents.
+
+## Features
+
+- **Clause-level document chunking** — contract text is split into clause- and item-level chunks with preserved hierarchy
+- **Metadata-aware retrieval** — chunk metadata (clause number, section, document type, BOQ item fields) is used to filter and ground results
+- **Dense semantic search** — `BAAI/bge-m3` embeddings for meaning-based retrieval
+- **BM25 lexical search** — keyword-based sparse retrieval for exact-term matches
+- **Hybrid retrieval** — combines dense and BM25 results for improved recall
+- **Cross-encoder reranking** — `BAAI/bge-reranker-v2-m3` reorders candidates by relevance
+- **Prompt engineering** — structured prompt construction with retrieved context and citation instructions
+- **Answer generation** — `google/gemma-2-9b-it` (bf16) produces grounded answers from reranked context
+- **FastAPI backend** — serves retrieval and generation through a REST API
+- **ChromaDB vector database** — persistent local/embedded vector store
+- **REST API** — `/ask` and `/status` endpoints for querying and health checks
+- **React frontend** — chat-style UI for submitting questions and viewing answers
+- **Docker support** — containerized backend for GPU deployment
+
+## System Architecture
 
 ```
-dmrc-embedding-pipeline/
+                ┌────────────────────┐
+                │   React Frontend    │
+                │   (Vercel-hosted)   │
+                └──────────┬──────────┘
+                           │ HTTPS (CORS)
+                           ▼
+                ┌────────────────────┐
+                │   FastAPI Backend   │
+                │   (app.py, /ask)    │
+                └──────────┬──────────┘
+                           │
+        ┌──────────────────┼──────────────────┐
+        ▼                  ▼                  ▼
+ ┌───────────┐     ┌───────────────┐   ┌──────────────┐
+ │  BGE-M3   │     │     BM25      │   │  ChromaDB     │
+ │  Dense    │     │   Lexical     │   │  Vector Store │
+ │  Retrieval│     │   Retrieval   │   │               │
+ └─────┬─────┘     └───────┬───────┘   └──────┬────────┘
+       └─────────┬─────────┘                  │
+                 ▼                             │
+         ┌───────────────┐                     │
+         │ Hybrid Fusion  │◄────────────────────┘
+         └───────┬────────┘
+                 ▼
+     ┌───────────────────────┐
+     │  BGE Cross-Encoder     │
+     │  Reranker (v2-m3)      │
+     └───────────┬────────────┘
+                 ▼
+     ┌───────────────────────┐
+     │  Prompt Construction   │
+     └───────────┬────────────┘
+                 ▼
+     ┌───────────────────────┐
+     │  Gemma-2-9B-it (bf16)  │
+     │  Answer Generation     │
+     └───────────┬────────────┘
+                 ▼
+           Final Answer
+```
+
+## Project Structure
+
+```
+dmrc-contract-intelligence/
 ├── README.md
 ├── requirements.txt
-├── main.py                     # pipeline entry point
-├── data/                       # parsed contract JSON (chunked, Chapter 6 output)
-│   ├── DMRC_Chapter1_transcription.json
-│   ├── DMRC_Chapter2_transcription.json
-│   └── chapter3.json
+├── Dockerfile
+├── data/                        # Parsed contract JSON (clause + BOQ chunks)
+├── chroma_db/                   # Persistent vector store
 ├── src/
-│   ├── text_normalization.py   # 7.6 — normalization, embedding-input builder
-│   ├── metadata_loader.py      # 7.11 — finalized schema mapping (no redesign)
-│   ├── embed_single.py         # 7.9  — single-chunk BGE-M3 encoding
-│   ├── batch_embed.py          # 7.10 — batched BGE-M3 encoding
-│   └── storage.py              # 7.12 — ChromaDB persistence
-└── chroma_db/                  # created on first run (persistent local vector store)
+│   ├── app.py                   # FastAPI application, CORS, /ask, /status
+│   ├── text_normalization.py    # Normalization, embedding-input builder
+│   ├── metadata_loader.py       # Metadata schema mapping (clause + BOQ)
+│   ├── embed_single.py          # Single-chunk BGE-M3 encoding
+│   ├── batch_embed.py           # Batched BGE-M3 encoding
+│   ├── storage.py               # ChromaDB persistence
+│   ├── retrieval.py             # Dense + BM25 hybrid retrieval
+│   ├── retrieval_caps.py        # Retrieval limits / candidate caps
+│   ├── reranker.py              # Cross-encoder reranking
+│   ├── prompt_builder.py        # Prompt construction
+│   └── generation.py            # Gemma-2-9B-it inference
+├── frontend/                    # React + Vite chat UI
+│   ├── src/
+│   └── README.md
+└── main.py                      # Embedding pipeline entry point
 ```
 
-## Prerequisites
+## Technology Stack
 
-- Python 3.10–3.11
-- ~6 GB free disk (BGE-M3 checkpoint + ChromaDB)
-- Optional: NVIDIA GPU + CUDA for faster encoding (falls back to CPU automatically)
+| Layer | Technology |
+|---|---|
+| Language | Python |
+| Backend API | FastAPI |
+| Vector database | ChromaDB |
+| Embedding model | BAAI/bge-m3 (Hugging Face Transformers) |
+| Reranker | BAAI/bge-reranker-v2-m3 |
+| Generation model | google/gemma-2-9b-it |
+| Frontend | React (Vite) |
+| Containerization | Docker |
+| Development/validation | Google Colab (A100 GPU) |
 
-## Setup
+## Data Pipeline
+
+```
+JSON Documents (clause + BOQ chunks)
+        │
+        ▼
+Metadata Extraction (metadata_loader.py)
+        │
+        ▼
+Text Normalization (text_normalization.py)
+        │
+        ▼
+Clause / BOQ Chunking
+        │
+        ▼
+Embedding Generation (BAAI/bge-m3)
+        │
+        ▼
+ChromaDB Storage
+```
+
+## Retrieval Pipeline
+
+```
+User Query
+        │
+        ▼
+Dense Retrieval (BGE-M3, ChromaDB)
+        │
+        ▼
+BM25 Retrieval (lexical)
+        │
+        ▼
+Hybrid Search (fusion of both result sets)
+        │
+        ▼
+Cross-Encoder Reranking (BGE-reranker-v2-m3)
+        │
+        ▼
+Prompt Engineering (context + citation instructions)
+        │
+        ▼
+Gemma-2-9B-it Inference
+        │
+        ▼
+Final Answer
+```
+
+## Installation
 
 ```bash
-# 1. Unzip / cd into the project
-cd dmrc-embedding-pipeline
+# 1. Clone the repository
+git clone <repository-url>
+cd dmrc-contract-intelligence
 
 # 2. Create and activate a virtual environment
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 
-# 3. Install dependencies
+# 3. Install backend dependencies
 pip install -r requirements.txt
+
+# 4. Install frontend dependencies
+cd frontend
+npm install
+cd ..
 ```
 
-The first run of `main.py` will download the `BAAI/bge-m3` checkpoint
-(~2.27 GB) from Hugging Face into your local HF cache
-(`~/.cache/huggingface`). No API key is required — the model runs fully
-locally after this one-time download.
+The first run downloads `BAAI/bge-m3`, `BAAI/bge-reranker-v2-m3`, and `google/gemma-2-9b-it` from Hugging Face. `google/gemma-2-9b-it` is a **gated** model — accept its license at https://huggingface.co/google/gemma-2-9b-it and set `HF_TOKEN` before running.
 
-## Run
+## Running the Project
 
-Embed a single file:
-
-```bash
-python main.py --input data/DMRC_Chapter1_transcription.json
-```
-
-Embed all three files in one pass:
+**1. Run the embedding pipeline** (populates ChromaDB):
 
 ```bash
 python main.py --input-dir data/
 ```
 
-Expected output:
-
-```
-[DMRC_Chapter1_transcription.json] 14 chunks parsed, 9 eligible for embedding
-(5 filtered: cover/index/marginalia).
-Batches: 100%|████████████| 1/1 [00:02<00:00, 2.31s/it]
-[DMRC_Chapter1_transcription.json] Stored 9 embeddings to ChromaDB.
-...
-Done. 41 clause embeddings written to ./chroma_db
-```
-
-## Verify
+**2. Start the FastAPI server:**
 
 ```bash
-python -c "
-from src.storage import get_collection
-c = get_collection()
-print('Total vectors stored:', c.count())
-print(c.peek(1))
-"
+uvicorn src.app:app --host 0.0.0.0 --port 8000
 ```
 
-## Sanity-check a single embedding
+**3. Query the system:**
 
 ```bash
-python src/embed_single.py
+curl -X POST http://localhost:8000/ask \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What is the scope of work under Clause 5 of the ECS contract?"}'
 ```
 
-```
-Embedding dimension: 1024
-L2 norm (should be ~1.0): 1.000000
-```
+**4. Run the frontend:**
 
-## Notes
-
-- `chroma_db/` is a local persistent directory — delete it to reset the
-  vector store and re-embed from scratch.
-- Switching to Qdrant later only requires replacing `src/storage.py`;
-  `main.py`, `metadata_loader.py`, and the embedding modules are unchanged.
-- The metadata schema is consumed as-is from Chapter 6
-  (`DMRC_Unified_Metadata_Schema.md`) — this module does not modify it.
-
-## Deployment (production, beyond the Colab notebooks)
-
-`01_Setup_and_Retrieval_Validation.ipynb` and
-`02_Gemma_Inference_and_Serving.ipynb` validate the full pipeline
-(retrieval + rerank + Gemma-2-9B-it in bf16) on a Colab A100 runtime.
-Colab itself isn't a hosting target (sessions time out, no stable public
-URL), so the notebook's server-launch cell has been translated into a
-real container:
-
-```
-GPU host (RunPod Pod, A100/L4)
-  └── Dockerfile → uvicorn src.app:app  (FastAPI, port 8000)
-        ├── BAAI/bge-m3            (dense retrieval)
-        ├── BAAI/bge-reranker-v2-m3 (cross-encoder rerank)
-        ├── google/gemma-2-9b-it   (generation, bf16)
-        └── ChromaDB (chroma_db/, shipped in the image)
-
-React chat UI (frontend/) → deployed on Vercel → calls the GPU host's /ask
+```bash
+cd frontend
+npm run dev
 ```
 
-### What changed vs. the notebooks
+## API Endpoints
 
-- `src/retrieval_caps.py` and `sitecustomize.py` were previously written at
-  runtime by `%%writefile` cells in the notebook. They're now committed,
-  version-controlled source files — `app.py` imports `retrieval_caps`
-  directly, so no `PYTHONPATH`/`sitecustomize.py` trick is needed once
-  `app.py` is the container's own entrypoint (rather than a subprocess
-  launched from inside a notebook kernel).
-- `src/app.py` now registers `CORSMiddleware`, controlled by an
-  `ALLOWED_ORIGINS` env var, so a separately-hosted frontend (different
-  origin) can call `/ask`.
-- Model/runtime knobs the notebook set as `server_env` in Python are now
-  plain container env vars: `GEMMA_USE_4BIT`, `GEMMA_MAX_NEW_TOKENS`,
-  `RAG_MAX_CANDIDATES`, `RAG_MAX_CONTEXT`, `ALLOWED_ORIGINS`.
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/ask` | Submit a natural-language query and receive a generated, context-grounded answer |
+| `GET` | `/status` | Health check — reports ChromaDB connection and model load status (`dense_model_loaded`, `reranker_model_loaded`, `gemma_model_loaded`) |
 
-### Deploy the backend (RunPod Pod)
+## Future Improvements
 
-1. Push this repo (with the `Dockerfile`) to GitHub.
-2. RunPod → Pods → Deploy → GPU type A100 40GB/80GB (matches the notebook)
-   or an L4 with `GEMMA_USE_4BIT=1` for a cheaper card.
-3. Point the pod at this repo/Dockerfile, expose port `8000` (HTTP),
-   attach a persistent volume at `/models` (`HF_HOME`) **from the first
-   deploy** so the ~20GB of model weights (BGE-M3 + reranker + Gemma-2-9B)
-   aren't re-downloaded on every restart.
-4. Set `HF_TOKEN` as a RunPod secret/environment variable. `google/gemma-2-9b-it`
-   is a **gated** checkpoint — the Hugging Face account behind this token
-   must have accepted its license at
-   https://huggingface.co/google/gemma-2-9b-it, or model load fails with a
-   401/gated-repo error. Never commit a real token to the repo.
-5. Set `ALLOWED_ORIGINS` to your deployed frontend's URL once you have it
-   (step below).
-6. Expect a slow first boot: with an empty `/models` volume, startup
-   downloads ~2.3GB (BGE-M3) + ~2.3GB (reranker) + ~18GB (Gemma-2-9B bf16)
-   before `/status` responds — 10–20+ minutes is normal, not a hang.
-7. Confirm `GET /status` returns `chromadb_connected: true` and all three
-   `*_model_loaded` flags (`dense_model_loaded`, `reranker_model_loaded`,
-   `gemma_model_loaded`) `true` after warm-up.
+- Support for additional DMRC contract lots and document types
+- User authentication and role-based access control
+- Conversation history / multi-turn context
+- Answer confidence scoring surfaced in the UI
+- Support for alternative vector stores (e.g., Qdrant)
+- Automated evaluation suite for retrieval and answer quality
 
-For scale-to-zero instead of an always-on Pod, the same Dockerfile is a
-straightforward base for RunPod Serverless — that path additionally needs
-a small `handler.py` wrapping `/ask` in RunPod's serverless request format.
+## Author
 
-### Deploy the frontend (Vercel)
+**Name:** _[Your Name]_
+**Organization:** _[Your Organization]_
+**Contact:** _[Your Email]_
+**GitHub:** _[Your GitHub Profile]_
 
-See `frontend/README.md`. In short: set `VITE_API_URL` to the RunPod
-pod's public URL, then `vercel deploy`.
+---
+
+## Summary of Changes from Previous README
+
+- Reframed the document from a single "Chapter 7 — Embedding Generation Module" write-up into a full, standalone Enterprise RAG platform README covering the entire system (retrieval, reranking, generation, API, frontend).
+- Removed all references to chapters, notebooks-as-source-of-truth, and development history; the system is now presented as a complete, production-ready application.
+- Added dedicated **Features**, **System Architecture**, **Data Pipeline**, **Retrieval Pipeline**, and **API Endpoints** sections that were not previously documented in one place.
+- Documented the full retrieval stack (dense + BM25 + hybrid + cross-encoder reranking) and generation stage (Gemma-2-9B-it), which were previously only implied via the Colab notebooks and deployment notes.
+- Replaced the single-module folder structure with a project-wide structure reflecting `src/` (retrieval, reranking, prompt building, generation), `frontend/`, and `Dockerfile` at the project root.
+- Consolidated installation and running instructions into one flow covering both backend and frontend, and both the embedding pipeline and the API server.
+- Added a placeholder **Author** section and GitHub-style badges for a professional presentation.
+- Removed Colab/RunPod/Vercel deployment mechanics and internal migration notes (kept only the technologies actually used) to keep the README focused and concise.

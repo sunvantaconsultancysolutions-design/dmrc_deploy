@@ -55,7 +55,13 @@ from . import retrieval_caps  # noqa: F401 -- side-effect import, must run
                                 # retrieval_caps.py's docstring)
 from .bm25_index import rebuild_bm25_index
 from .hybrid_retriever import hybrid_search
-from .prompt_engineering import NO_CONTEXT_ANSWER, build_prompt, has_usable_context
+from .prompt_engineering import (
+    NO_CONTEXT_ANSWER,
+    build_prompt,
+    get_boq_item_number,
+    get_boq_page_number,
+    has_usable_context,
+)
 from .query import get_model as get_dense_model
 from .query import extract_clause_no, get_chunk_by_clause_no, get_chunks_by_parent_clause
 from .reranker import evaluate_confidence, expand_with_siblings, get_reranker_model, rerank
@@ -141,8 +147,10 @@ class SourceItem(BaseModel):
     """One entry in the response's "sources" list, populated from a
     reranked candidate's metadata (Chapter 6/9's metadata schema).
     Fields are optional because not every chunk carries every field
-    (e.g. a contract clause has no item_number; a BOQ row has no
-    clause_no).
+    (e.g. a contract clause has no clause-level "own" BOQ item number,
+    only an optional cross-reference to one; a BOQ row has no
+    clause_no). See _build_sources() for how `item_number` and `page`
+    are resolved differently for clause vs. BOQ candidates.
     """
 
     clause: Optional[str] = None
@@ -321,12 +329,37 @@ def _build_sources(reranked_candidates: List[Dict[str, Any]]) -> List[SourceItem
     sources: List[SourceItem] = []
     for candidate in reranked_candidates:
         metadata = candidate.get("metadata") or {}
+
+        # BUGFIX: BOQ metadata field mapping.
+        #
+        # A BOQ row's own item number lives under the "s_no" metadata
+        # field, not "item_number" -- "item_number" only exists on
+        # CLAUSE metadata, as an optional cross-reference to a related
+        # BOQ item. Previously this function always read
+        # metadata.get("item_number"), which is correct for clauses
+        # but returns None for every BOQ-sourced answer, so BOQ
+        # citations never reached the frontend even though
+        # prompt_engineering.format_context() was already rendering
+        # them correctly for the LLM prompt.
+        #
+        # Similarly, a BOQ row's page can be under "page_number" if it
+        # doesn't carry "pdf_page" -- get_boq_page_number() applies the
+        # same fallback prompt_engineering.py already used when
+        # formatting BOQ blocks for the prompt.
+        #
+        # Both accessors are imported from prompt_engineering.py so
+        # this stays in sync with prompt formatting by construction,
+        # rather than duplicating (and re-diverging from) the lookup.
+        is_boq = metadata.get("chunk_type") == "boq"
+        item_number = get_boq_item_number(metadata) if is_boq else metadata.get("item_number")
+        page = get_boq_page_number(metadata) if is_boq else metadata.get("pdf_page")
+
         sources.append(
             SourceItem(
                 clause=metadata.get("clause_no"),
-                page=metadata.get("pdf_page"),
+                page=page,
                 document=metadata.get("document_name"),
-                item_number=metadata.get("item_number"),
+                item_number=item_number,
                 retrieval_source=candidate.get("retrieval_source"),
                 reranker_score=candidate.get("reranker_score"),
                 chunk_id=candidate.get("chunk_id") or metadata.get("chunk_id"),

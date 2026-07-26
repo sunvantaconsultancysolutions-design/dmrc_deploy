@@ -39,4 +39,4 @@ rank-bm25==0.2.2
 # works around bitsandbytes-foundation#1905 (libnvJitLink.so.13 dlopen
 # failure) on some Colab CUDA builds.
 bitsandbytes>=0.43.0
-nvidia-nvjitlink-cu13
+

@@ -121,6 +121,12 @@ class BM25Index:
 
         candidates = []
         for idx, score in enumerate(scores):
+            # Skip non-matches. A score of 0.0 (or, defensively, any
+            # non-positive score) means the query shares no scored terms
+            # with this document -- BM25 offers no evidence it's
+            # relevant, so it must not be returned just to pad out top_k.
+            if score <= 0.0:
+                continue
             metadata = self.metadatas[idx]
             if not self._matches_filter(metadata, metadata_filter):
                 continue

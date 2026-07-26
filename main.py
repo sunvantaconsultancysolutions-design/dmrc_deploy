@@ -12,20 +12,34 @@ Usage:
     python main.py --input-dir data/
 """
 
+# --- Standard library --------------------------------------------------
 import argparse
 import json
 import os
 import sys
+from typing import Any, List, Optional, Tuple
 
+# --- Path setup: allow the local `src/` pipeline modules to be imported
+# below without this script needing to live inside a proper installed
+# package. Must run before the local imports that follow it.
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 
+# --- Local pipeline modules (Chapter 7) --------------------------------
 from metadata_loader import build_chunk_records, build_boq_chunk_records, is_boq_json
 from text_normalization import build_embedding_input, build_boq_embedding_input
 from batch_embed import embed_batch
 from storage import store_chunks
 
+# chunk_type values eligible for embedding. "clause" (Chapter text) and
+# "boq" (Bill-of-Quantities items) both carry real embeddable content;
+# cover_page/index/marginalia/stamp remain excluded per the Chapter 7
+# Chunking Strategy.
+EMBEDDABLE_CHUNK_TYPES = {"clause", "boq"}
 
-def _load_records(filepath: str, carry_over_record=None):
+
+def _load_records(
+    filepath: str, carry_over_record: Optional[Any] = None
+) -> Tuple[str, List[Any], Optional[Any]]:
     """Parse one JSON file and build its chunk records. carry_over_record
     is the last real-clause chunk left open by the PREVIOUS file (see
     metadata_loader.build_chunk_records) so a continuation fragment at
@@ -35,8 +49,20 @@ def _load_records(filepath: str, carry_over_record=None):
     next file's call.
     """
     filename = os.path.basename(filepath)
-    with open(filepath, "r", encoding="utf-8") as f:
-        parsed_json = json.load(f)
+
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            parsed_json = json.load(f)
+    except FileNotFoundError:
+        # Re-raised as-is (same exception type/exit behavior as before)
+        # after naming the offending file -- in --input-dir mode there
+        # can be dozens of files in flight, and a bare traceback alone
+        # doesn't say which one failed to open.
+        print(f"[ERROR] Input file not found: {filepath}", file=sys.stderr)
+        raise
+    except json.JSONDecodeError as exc:
+        print(f"[ERROR] Invalid JSON in {filepath}: {exc}", file=sys.stderr)
+        raise
 
     if is_boq_json(parsed_json):
         # BOQ items carry no continues_previous flag (nothing spans a
@@ -52,14 +78,7 @@ def _load_records(filepath: str, carry_over_record=None):
     return filename, records, open_record
 
 
-# chunk_type values eligible for embedding. "clause" (Chapter text) and
-# "boq" (Bill-of-Quantities items) both carry real embeddable content;
-# cover_page/index/marginalia/stamp remain excluded per the Chapter 7
-# Chunking Strategy.
-EMBEDDABLE_CHUNK_TYPES = {"clause", "boq"}
-
-
-def _build_embedding_text(record):
+def _build_embedding_text(record: Any) -> str:
     """Routes embedding-text construction by chunk_type so the existing
     Chapter (clause) pipeline is untouched while BOQ chunks get their
     own appropriately-shaped input built from BOQ metadata.
@@ -75,7 +94,7 @@ def _build_embedding_text(record):
     )
 
 
-def _embed_and_store(filename: str, records: list):
+def _embed_and_store(filename: str, records: List[Any]) -> int:
     """Embed and persist the chunks already finalized for one file.
 
     Called only AFTER cross-file continuation merges are resolved, so a
@@ -114,7 +133,7 @@ def _embed_and_store(filename: str, records: list):
     return n_stored
 
 
-def process_file(filepath: str):
+def process_file(filepath: str) -> int:
     """Single-file mode. No other file is available to carry a leading
     continuation fragment back into, so carry_over_record is None.
     """
@@ -122,18 +141,20 @@ def process_file(filepath: str):
     return _embed_and_store(filename, records)
 
 
-def process_directory(input_dir: str):
+def process_directory(input_dir: str) -> int:
     """Batch mode: build chunk records for every file FIRST (in filename
     order, threading carry_over_record between calls so cross-file
     continuations are correctly merged), and only THEN embed and store --
     see _embed_and_store for why storage must wait until all merges
     across the whole document sequence are resolved.
     """
-    filepaths = [
-        os.path.join(input_dir, fname)
-        for fname in sorted(os.listdir(input_dir))
-        if fname.endswith(".json")
-    ]
+    try:
+        json_filenames = sorted(fname for fname in os.listdir(input_dir) if fname.endswith(".json"))
+    except FileNotFoundError:
+        print(f"[ERROR] --input-dir path not found: {input_dir}", file=sys.stderr)
+        raise
+
+    filepaths = [os.path.join(input_dir, fname) for fname in json_filenames]
 
     built = []
     carry_over_record = None
@@ -147,7 +168,11 @@ def process_directory(input_dir: str):
     return total
 
 
-def main():
+def main() -> None:
+    """CLI entry point: parse args, run the requested mode(s), report
+    the total number of embeddings written. See module docstring for
+    the two supported invocations (--input / --input-dir).
+    """
     parser = argparse.ArgumentParser(description="DMRC Contract Embedding Generation (BGE-M3)")
     parser.add_argument("--input", type=str, help="Path to a single parsed JSON file")
     parser.add_argument("--input-dir", type=str, help="Directory of parsed JSON files")
@@ -166,4 +191,14 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as exc:
+        # Additive only: prints a clear one-line summary before letting
+        # the original exception propagate, so the full traceback (and
+        # the same process exit code Python already used) is preserved
+        # exactly as before -- this just makes pipeline failures easy to
+        # spot at the top of a long batch-mode log instead of having to
+        # scroll to the bottom of a traceback to find out what broke.
+        print(f"[ERROR] Embedding pipeline failed: {exc}", file=sys.stderr)
+        raise

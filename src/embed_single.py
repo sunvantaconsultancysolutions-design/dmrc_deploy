@@ -1,19 +1,18 @@
 """
 embed_single.py
 
-Loads BAAI/bge-m3 locally via sentence-transformers and encodes a single
-clause chunk into a dense embedding vector. This module covers Chapter
-7.9 (Local Python Implementation) of the Software Design Report.
+Encodes a single clause chunk into a dense embedding vector using the
+BAAI/bge-m3 model. This module covers Chapter 7.9 (Local Python
+Implementation) of the Software Design Report.
+
+Note: this module does NOT load its own copy of the BGE-M3 model. It
+reuses the lazily-loaded, process-wide singleton exposed by
+batch_embed.get_model() (Chapter 7.10), so a process that performs both
+single-chunk and batch embedding only ever holds one ~2.27GB model
+instance in memory instead of two.
 """
 
-from sentence_transformers import SentenceTransformer
-
-MODEL_NAME = "BAAI/bge-m3"
-
-# Loaded once per process. Loading downloads (or reads from local HF
-# cache) the ~2.27GB BGE-M3 checkpoint and initializes it on GPU if
-# available, else CPU.
-model = SentenceTransformer(MODEL_NAME)
+from batch_embed import get_model
 
 
 def embed_chunk(text: str):
@@ -24,6 +23,7 @@ def embed_chunk(text: str):
     similarity -- this is a storage/encoding-time property, independent
     of how retrieval later uses the vectors.
     """
+    model = get_model()
     embedding = model.encode(
         text,
         normalize_embeddings=True,

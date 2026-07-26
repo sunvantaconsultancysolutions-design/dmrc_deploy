@@ -84,6 +84,39 @@ BOQ Item 4.2"""
 # 11.6 Retrieved Context / 11.10 step 2-4 (dedupe, merge, insert metadata)
 # ---------------------------------------------------------------------------
 
+def get_boq_item_number(metadata: Dict[str, Any]) -> Optional[str]:
+    """Returns a BOQ row's own identifying item number.
+
+    IMPORTANT: this is read from the "s_no" (Serial Number) metadata
+    field -- the column BOQ tables are keyed by -- NOT from
+    "item_number". "item_number" is a different field that only
+    appears on CLAUSE metadata, where it is a cross-reference to a
+    related BOQ item (see format_context()'s clause branch below); it
+    is not present on the BOQ row's own metadata.
+
+    Exposed as a shared accessor (rather than inlined only in
+    _format_boq_block()) so app.py's API layer reads the exact same
+    field this module's prompt formatting does, instead of maintaining
+    a second, independent (and previously incorrect) copy of this
+    lookup.
+    """
+    return metadata.get("s_no")
+
+
+def get_boq_page_number(metadata: Dict[str, Any]) -> Optional[Any]:
+    """Returns a BOQ row's page reference.
+
+    Prefers "pdf_page" (the same field clause metadata uses) and falls
+    back to "page_number" for BOQ rows that only carry the latter.
+    Shared with app.py for the same reason as get_boq_item_number()
+    above -- one accessor, used everywhere BOQ page info is needed.
+    """
+    page_number = metadata.get("pdf_page")
+    if page_number in (None, ""):
+        page_number = metadata.get("page_number")
+    return page_number
+
+
 def deduplicate_candidates(candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Removes duplicate chunk_ids, keeping the first (highest-ranked)
     occurrence. hybrid_retriever.merge_candidates() already dedupes
@@ -134,12 +167,18 @@ def _format_boq_block(index: int, candidate: Dict[str, Any]) -> str:
     type, schedule, contract, page) instead of the clause fields
     format_context() uses. Kept as a separate function so clause
     formatting in format_context() is untouched.
+
+    Item number and page are read via get_boq_item_number() /
+    get_boq_page_number() rather than inline dict lookups, so app.py's
+    API layer resolves these BOQ fields identically to this prompt
+    formatting (see those helpers' docstrings for the s_no vs.
+    item_number distinction).
     """
     metadata = candidate["metadata"]
 
     lines = [f"Rank {index}"]
 
-    s_no = metadata.get("s_no")
+    s_no = get_boq_item_number(metadata)
     lines.append(f"BOQ Item {s_no}" if s_no else "BOQ Item (number unavailable)")
 
     detail_fields = [
@@ -159,9 +198,7 @@ def _format_boq_block(index: int, candidate: Dict[str, Any]) -> str:
     lines.append(chunk_text)
 
     footer_parts = []
-    page_number = metadata.get("pdf_page")
-    if page_number in (None, ""):
-        page_number = metadata.get("page_number")
+    page_number = get_boq_page_number(metadata)
     if page_number not in (None, ""):
         footer_parts.append(f"Page {page_number}")
     document_name = _format_document_name(metadata)
