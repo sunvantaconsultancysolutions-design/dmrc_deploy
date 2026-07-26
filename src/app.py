@@ -165,6 +165,15 @@ class SourceItem(BaseModel):
     retrieval_source: Optional[str] = None
     reranker_score: Optional[float] = None
     chunk_id: Optional[str] = None
+    # TASK 3 -- UI retrieval label fix. Exposes the existing
+    # metadata["chunk_type"] ("clause" or "boq", set unconditionally by
+    # metadata_loader.py for every chunk) so the frontend can render
+    # "Grounded in N Retrieved Clauses" / "... BOQ Items" / "...
+    # Documents" (mixed) from real retrieval metadata instead of the
+    # hardcoded "clauses" wording it used before. Optional/back-compat:
+    # any existing client that ignores this new field keeps working
+    # unchanged.
+    chunk_type: Optional[str] = None
 
 
 class AnswerResponse(BaseModel):
@@ -368,6 +377,7 @@ def _build_sources(reranked_candidates: List[Dict[str, Any]]) -> List[SourceItem
                 retrieval_source=candidate.get("retrieval_source"),
                 reranker_score=candidate.get("reranker_score"),
                 chunk_id=candidate.get("chunk_id") or metadata.get("chunk_id"),
+                chunk_type=metadata.get("chunk_type"),
             )
         )
     return sources

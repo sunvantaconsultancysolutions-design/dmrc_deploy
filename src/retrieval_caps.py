@@ -42,17 +42,21 @@ import src.reranker as reranker
 # still take ceil(30/16)=2 batches -- this change adds essentially zero
 # reranker latency.
 #
-# MAX_CONTEXT: left at the repository default of 15. This was NEVER the
-# bug -- the forensic audit found the "grounded in 4 clauses" behavior
-# was caused by the Colab deployment notebook setting RAG_MAX_CONTEXT=4
-# at launch time (overriding this default), not by anything in this
-# file. See the updated dmrc_deploy_colab_runner.ipynb, which now omits
-# that override entirely so this repository default is what actually
-# governs production. 15 comfortably exceeds RERANK_TOP_N=12 (app.py),
-# so this cap no longer fires in normal operation at all -- it remains
-# only as a defensive ceiling against a future misconfiguration.
+# MAX_CONTEXT: raised 15 -> 20 (repository default), to match the
+# Dockerfile's deployed RAG_MAX_CONTEXT (also raised 12 -> 20). Root
+# cause: this is the cap app.py's final safety-net check enforces right
+# before prompt construction, and it is the ONLY thing that caps the
+# exact-BOQ-parent-lookup path (get_chunk_by_boq_item_no() skips
+# reranking/RERANK_TOP_N entirely on an exact match, see app.py). A BOQ
+# parent with more than MAX_CONTEXT children -- e.g. 1.02.E.2's 15
+# sub-items (a-o) -- was silently truncated to the first N alphabetically
+# (a-l under the old 12). 20 comfortably covers observed BOQ family sizes
+# in this corpus while still bounding worst-case prompt size; it also
+# still comfortably exceeds RERANK_TOP_N=12 (app.py) for the normal
+# hybrid_search()/rerank() path, so this cap continues to be a no-op
+# there and only bites on wide exact-match families as intended.
 MAX_CANDIDATES = int(os.environ.get("RAG_MAX_CANDIDATES", "30"))  # was 20 -- into reranker
-MAX_CONTEXT = int(os.environ.get("RAG_MAX_CONTEXT", "15"))          # unchanged -- into the LLM
+MAX_CONTEXT = int(os.environ.get("RAG_MAX_CONTEXT", "20"))          # was 15 -- into the LLM
 
 _orig_hybrid = hybrid_retriever.hybrid_search
 _orig_rerank = reranker.rerank

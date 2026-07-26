@@ -62,6 +62,16 @@ COPY chroma_db/ ./chroma_db/
 # longer undercuts app.py's own tuned retrieval breadth. Keep these two
 # values in sync with app.py's constants if either changes again.
 #
+# FIX (BOQ family truncation): RAG_MAX_CONTEXT raised 12 -> 20. This is
+# the value app.py's final safety-net check (`retrieval_caps.MAX_CONTEXT`)
+# actually enforces in this deployed image -- the exact-BOQ-parent lookup
+# path (get_chunk_by_boq_item_no()) is intentionally NOT capped by
+# RERANK_TOP_N (it skips reranking entirely, see app.py's `exact_match`
+# branch), so this was the only thing truncating a BOQ parent's full
+# child family. Confirmed case: parent 1.02.E.2 has 15 sub-items (a-o),
+# and 12 silently cut it to a-l. 20 comfortably covers observed BOQ
+# family sizes in this corpus while still bounding worst-case prompt size.
+#
 # FIX: ALLOWED_ORIGINS="*" removed -- src/app.py already falls back to
 # "*" on its own when this var is unset (its own comment marks that as
 # a local-dev-only default). Hardcoding it here added no behavior, only
@@ -74,7 +84,7 @@ COPY chroma_db/ ./chroma_db/
 # with gemma_inference.py's MAX_NEW_TOKENS constant -- it exists here
 # only so the value is explicit and auditable, not to diverge from it.
 ENV RAG_MAX_CANDIDATES=60 \
-    RAG_MAX_CONTEXT=12 \
+    RAG_MAX_CONTEXT=20 \
     GEMMA_USE_4BIT=0 \
     GEMMA_MAX_NEW_TOKENS=1536
 

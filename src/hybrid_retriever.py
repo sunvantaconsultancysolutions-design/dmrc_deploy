@@ -148,12 +148,70 @@ def _normalize_scores(results: list, score_key: str) -> list:
     return results
 
 
+def _dedupe_by_document_text(candidates: list) -> list:
+    """TASK 1 FIX -- BOQ semantic-retrieval recall.
+
+    Root cause: the BOQ corpus reuses the exact same short line-item
+    description verbatim under many different parents/panels -- e.g.
+    "1 No. Digital Ammeter, CT operated." is a distinct chunk_id under
+    dozens of different `parent` BOQ items. Step 2 of the merge above
+    ("remove duplicate chunk_ids") does not catch this: each occurrence
+    IS a different chunk_id (a different BOQ row), it just happens to
+    carry identical text.
+
+    Confirmed live against this project's own ChromaDB collection: BM25
+    alone returns "Explain Digital Ammeter"'s top-30 candidates as 17
+    copies of the single string "1 No. Digital Ammeter, CT operated."
+    (5 unique strings total in 30 hits); "Explain Selector Switch"
+    returns 30 hits across only 7 unique strings. Dense retrieval hits
+    the same duplication, since near-identical text embeds to
+    near-identical vectors.
+
+    Why this breaks natural-language BOQ queries end-to-end (not just
+    "weak ranking"): reranker.py's evaluate_confidence() (Task 6,
+    unchanged by this fix) flags a query low-confidence when the top
+    reranker_score isn't separated from the median of the rest of the
+    pool -- a heuristic for "did the top hit actually stand out". When
+    15+ of the pool's candidates are the exact same string (and a
+    cross-encoder scores identical (query, text) pairs identically),
+    the median gets dragged up to the top score, separation collapses
+    to ~0, and the query is misclassified as out-of-domain even though
+    the right chunk was retrieved correctly. This is why these queries
+    fail completely (NO_CONTEXT_ANSWER) rather than just ranking lower.
+
+    Fix: collapse exact-duplicate document text to its single
+    highest-scoring occurrence, so one real match is one candidate
+    instead of seventeen. Only IDENTICAL text collapses (whitespace-
+    trimmed) -- near-duplicates with any wording difference (e.g. this
+    corpus's "Inbuilt" vs "Inbuild" typos) are left as distinct
+    candidates, so no genuinely different BOQ row is ever dropped.
+    Clause chunks are long, unique prose that essentially never
+    collides on this check, so clause retrieval is unaffected by
+    construction, not just by chance.
+    """
+    best_by_text: dict = {}
+    order: list = []
+    for c in candidates:
+        key = (c.get("document") or "").strip()
+        existing = best_by_text.get(key)
+        if existing is None:
+            best_by_text[key] = c
+            order.append(key)
+        elif c["score"] > existing["score"]:
+            best_by_text[key] = c
+    return [best_by_text[key] for key in order]
+
+
 def merge_candidates(dense_results: list, sparse_results: list, final_top_k: int = FINAL_TOP_K) -> list:
     """Implements Chapter 9.9's merge rules exactly:
 
       1. Merge dense and sparse result lists.
       2. Remove duplicate chunk_ids.
       3. For a chunk_id present in both lists, keep the higher score.
+      3.5. TASK 1 FIX -- collapse duplicate document TEXT (see
+           `_dedupe_by_document_text` above) to its single highest-scoring
+           occurrence, so a line item repeated verbatim across many BOQ
+           rows doesn't flood the pool with copies of itself.
       4. Return the Top-K merged results.
 
     "Score" is compared on the normalized_score computed by
@@ -199,6 +257,7 @@ def merge_candidates(dense_results: list, sparse_results: list, final_top_k: int
                 existing["score"] = r["normalized_score"]
 
     merged_list = list(merged.values())
+    merged_list = _dedupe_by_document_text(merged_list)
     merged_list.sort(key=lambda c: c["score"], reverse=True)
     return merged_list[:final_top_k]
 
