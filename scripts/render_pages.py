@@ -11,9 +11,9 @@ import fitz  # PyMuPDF (pip install pymupdf)
 # src/metadata_loader.py DOCUMENT_METADATA. Extend this dict when the
 # BOQ volumes (Vol-3) are added.
 DOC_PDFS = {
-    "DMRC-BE12BE14-VOL2-CH1": "Contract_Agreement_BE-12___BE-14_Lot_3_Vol-2-1-10.pdf",
-    "DMRC-BE12BE14-VOL2-CH2": "Contract_Agreement_BE-12___BE-14_Lot_3_Vol-2-11-20.pdf",
-    "DMRC-BE12BE14-VOL2-CH3": "Contract_Agreement_BE-12___BE-14_Lot_3_Vol-2-20-29.pdf",
+    "DMRC-BE12BE14-VOL2-CH1": "Contract Agreement BE-12 & BE-14 Lot 3 Vol-2-1-10.pdf",
+    "DMRC-BE12BE14-VOL2-CH2": "Contract Agreement BE-12 & BE-14 Lot 3 Vol-2-11-20.pdf",
+    "DMRC-BE12BE14-VOL2-CH3": "Contract Agreement BE-12 & BE-14 Lot 3 Vol-2-20-29.pdf",
 }
 
 DPI = 150
