@@ -174,6 +174,28 @@ def get_boq_page_number(metadata: Dict[str, Any]) -> Optional[Any]:
     return page_number
 
 
+def get_scanned_page(metadata: Dict[str, Any]) -> Optional[Any]:
+    """Page number stamped on the scanned image.
+
+    Prefers the document-control stamp captured during transcription:
+    "printed_page" on clause chunks, "stamp_number" on BOQ chunks
+    (added by scripts/patch_boq_stamps.py). Falls back to the PDF page
+    index when the scan carries no stamp (cover pages) or the stamp
+    was not captured. Leading zeros are stripped for display
+    ('000009' -> '9').
+
+    Shared with app.py for the same reason as get_boq_page_number():
+    one accessor, used everywhere the citation page is needed.
+    """
+    stamp = metadata.get("printed_page") or metadata.get("stamp_number")
+    if stamp not in (None, ""):
+        s = str(stamp).lstrip("0")
+        return s or "0"
+    if metadata.get("chunk_type") == "boq":
+        return get_boq_page_number(metadata)
+    return metadata.get("pdf_page")
+
+
 def deduplicate_candidates(candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Removes duplicate chunk_ids, keeping the first (highest-ranked)
     occurrence. hybrid_retriever.merge_candidates() already dedupes
@@ -266,7 +288,8 @@ def _format_boq_block(index: int, candidate: Dict[str, Any]) -> str:
     lines.append(chunk_text)
 
     footer_parts = []
-    page_number = get_boq_page_number(metadata)
+    # Rule 1: cite the number stamped on the scanned page, not the PDF index.
+    page_number = get_scanned_page(metadata)
     if page_number not in (None, ""):
         footer_parts.append(f"Page {page_number}")
     document_name = get_document_name(metadata)
@@ -324,9 +347,10 @@ def format_context(candidates: List[Dict[str, Any]]) -> str:
         lines = [f"Rank {i}", header, "", chunk_text]
 
         detail_parts = []
-        pdf_page = metadata.get("pdf_page")
-        if pdf_page not in (None, ""):
-            detail_parts.append(f"Page {pdf_page}")
+        # Rule 1: cite the number stamped on the scanned page, not the PDF index.
+        scanned_page = get_scanned_page(metadata)
+        if scanned_page not in (None, ""):
+            detail_parts.append(f"Page {scanned_page}")
         item_number = metadata.get("item_number")
         if item_number:
             detail_parts.append(f"BOQ Item {item_number}")

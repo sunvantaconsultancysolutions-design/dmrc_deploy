@@ -7,9 +7,16 @@
 //                      dense_model_loaded, reranker_model_loaded,
 //                      chromadb_connected }
 //
-// SourceItem: { clause, page, document, item_number, retrieval_source,
-//               reranker_score, chunk_id }  -- every field is optional,
-// since not all chunk types (contract clause vs. BOQ row) carry all of them.
+// SourceItem: { clause, page, pdf_page, document, document_id, image_url,
+//               item_number, retrieval_source, reranker_score, chunk_id,
+//               chunk_type } -- every field is optional, since not all
+// chunk types (contract clause vs. BOQ row) carry all of them.
+//
+// PDF Evidence Viewer (SVS-DMRC-2026-03): `page` is now the number
+// STAMPED on the scanned page (a string, e.g. "9"), not the PDF's own
+// page index -- that index lives separately in `pdf_page` (an int),
+// which is also the file-lookup key backing `image_url`
+// (/pages/{document_id}/pNNNN.jpg) when a render exists for that page.
 
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 

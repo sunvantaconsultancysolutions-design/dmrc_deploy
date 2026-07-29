@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import Message from "./components/Message.jsx";
 import ChatInput from "./components/ChatInput.jsx";
 import StatusBadge from "./components/StatusBadge.jsx";
+import PageViewer from "./components/PageViewer.jsx";
 import { askQuestion } from "./api.js";
 
 // TASK 1 -- Home-screen suggested questions, grouped by document type.
@@ -29,6 +30,7 @@ const SUGGESTION_GROUPS = [
 export default function App() {
   const [messages, setMessages] = useState([]);
   const [pending, setPending] = useState(false);
+  const [viewed, setViewed] = useState(null); // a SourceItem or null
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -42,6 +44,8 @@ export default function App() {
 
     try {
       const { answer, sources, confidence } = await askQuestion(query);
+      const firstWithImage = (sources || []).find((s) => s.image_url);
+      if (firstWithImage) setViewed(firstWithImage);
       setMessages((m) => [
         ...m,
         { role: "assistant", content: answer, sources, confidence },
@@ -73,6 +77,8 @@ export default function App() {
         <StatusBadge />
       </header>
 
+      <div className="app-columns">
+      <div className="chat-column">
       <main className="chat-scroll" ref={scrollRef}>
         {messages.length === 0 ? (
           <div className="empty-state">
@@ -147,7 +153,7 @@ export default function App() {
         ) : (
           <div className="msg-list">
             {messages.map((m, i) => (
-              <Message key={i} {...m} />
+              <Message key={i} {...m} onViewSource={setViewed} />
             ))}
             {pending && <Message role="assistant" isLoading />}
           </div>
@@ -164,6 +170,9 @@ export default function App() {
           SUNVANTA CONSULTANCY SOLUTIONS · CUSTOMER INTELLIGENT CHAT
         </p>
       </footer>
+      </div>
+      <PageViewer source={viewed} onClose={() => setViewed(null)} />
+      </div>
     </div>
   );
 }

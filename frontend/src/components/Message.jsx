@@ -1,13 +1,14 @@
-// TASK 2 -- retrieved source cards removed from the UI (per manager
-// request). The backend is untouched: /ask still runs full retrieval
-// and still returns `sources`/`chunk_type` on every response exactly as
-// before (see src/app.py's SourceItem / _build_sources()) -- this
-// component simply no longer renders that data. SourceChip and the old
-// buildGroundedLabel()/"Grounded in N Retrieved ..." formatting are no
-// longer used here; SourceChip.jsx is left in place, unmodified, in
-// case the source-card UI is reinstated later.
+// TASK 2 note (superseded by SVS-DMRC-2026-03, WP-9): source cards were
+// removed from this component per an earlier manager request; the
+// backend was left untouched throughout, still returning `sources` on
+// every response (see src/app.py's SourceItem / _build_sources()).
+// The PDF Evidence Viewer spec brings a source-chip strip back, now as
+// the click-through into the scanned-page viewer rather than the old
+// static card -- SourceChip.jsx below is the same component, updated
+// for click behaviour.
+import SourceChip from "./SourceChip.jsx";
 
-export default function Message({ role, content, isError, isLoading }) {
+export default function Message({ role, content, isError, isLoading, sources, onViewSource }) {
   const isUser = role === "user";
 
   return (
@@ -28,6 +29,14 @@ export default function Message({ role, content, isError, isLoading }) {
             <p>{content}</p>
           )}
         </div>
+
+        {!isUser && !isLoading && sources && sources.length > 0 && (
+          <div className="source-chip-row">
+            {sources.map((s, i) => (
+              <SourceChip key={s.chunk_id || i} source={s} onView={onViewSource} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

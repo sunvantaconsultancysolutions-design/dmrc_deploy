@@ -40,3 +40,6 @@ rank-bm25==0.2.2
 # failure) on some Colab CUDA builds.
 bitsandbytes>=0.43.0
 
+
+# PDF Evidence Viewer (WP-1): render source contract PDFs to page images.
+pymupdf

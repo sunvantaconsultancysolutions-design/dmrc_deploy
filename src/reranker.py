@@ -264,6 +264,36 @@ def rerank(
 MIN_ABSOLUTE_CONFIDENCE = float(os.environ.get("RAG_MIN_CONFIDENCE", "0.10"))
 MIN_SEPARATION_MARGIN = float(os.environ.get("RAG_MIN_SEPARATION", "0.08"))
 
+# BUGFIX (false-negative on short/generic queries, e.g. "what is the
+# penalty in the contract"): the separation-margin check above assumes
+# a real hit "stands out" above its own candidate pool -- but this
+# corpus legitimately contains multiple, independently relevant chunks
+# on the same topic (that's exactly what TASK 3's sibling expansion
+# below is built to surface, not suppress). A short/generic query can
+# retrieve several genuinely on-topic chunks that all score close
+# together, so top_score - median(rest) shrinks below
+# MIN_SEPARATION_MARGIN even though the top result is a strong match
+# on its own merits -- verified against BAAI/bge-reranker-v2-m3's
+# sigmoid scale (rerank() below), where 0.10 is a very low absolute
+# bar and 0.5+ reliably indicates a genuinely relevant (query, chunk)
+# pair, not noise.
+#
+# Fix: a top score comfortably above HIGH_CONFIDENCE_ABSOLUTE is
+# trusted on its own -- the separation check only runs to break ties
+# among weaker matches, where "nothing stands out" really is the
+# out-of-domain signature. This does not touch the out-of-domain path
+# (a genuinely off-topic query's best-of-a-bad-lot top score won't
+# clear this bar either) so no new false positives are introduced
+# there.
+#
+# Calibration note: 0.5 is a principled starting point (the sigmoid's
+# own midpoint) but, like MIN_ABSOLUTE_CONFIDENCE/MIN_SEPARATION_MARGIN
+# above, should be re-validated against real query logs -- see
+# scripts/calibrate_confidence.py, which replays a query set through
+# this exact function under both the old and new thresholds so the
+# effect of any further tuning is visible before it ships.
+HIGH_CONFIDENCE_ABSOLUTE = float(os.environ.get("RAG_HIGH_CONFIDENCE", "0.5"))
+
 
 def evaluate_confidence(reranked: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Distribution-based low-confidence detector, meant to run on
@@ -296,6 +326,13 @@ def evaluate_confidence(reranked: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     if top_score < MIN_ABSOLUTE_CONFIDENCE:
         return {"confident": False, "top_score": top_score, "reason": "below_absolute_floor"}
+
+    # BUGFIX: a strong top score is trusted regardless of separation --
+    # see the HIGH_CONFIDENCE_ABSOLUTE comment above for why "several
+    # good matches close together" must not be conflated with "no
+    # signal at all".
+    if top_score >= HIGH_CONFIDENCE_ABSOLUTE:
+        return {"confident": True, "top_score": top_score, "reason": "high_absolute_confidence"}
 
     rest = scores[1:]
     if rest:

@@ -46,6 +46,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import retrieval_caps  # side-effect import, must run before
@@ -64,6 +65,7 @@ from .prompt_engineering import (
     get_boq_item_number,
     get_boq_page_number,
     get_document_name,
+    get_scanned_page,
     has_usable_context,
     wants_detailed_answer,
 )
@@ -173,8 +175,11 @@ class SourceItem(BaseModel):
     """
 
     clause: Optional[str] = None
-    page: Optional[int] = None
+    page: Optional[str] = None  # CHANGED: stamped scan number (Rule 1)
+    pdf_page: Optional[int] = None  # NEW: internal file-lookup key (Rule 2)
     document: Optional[str] = None
+    document_id: Optional[str] = None  # NEW
+    image_url: Optional[str] = None  # NEW: /pages/{doc_id}/pNNNN.jpg
     item_number: Optional[str] = None
     retrieval_source: Optional[str] = None
     reranker_score: Optional[float] = None
@@ -252,6 +257,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         logger.exception(
             "Gemma 3 warm-up failed; will retry lazily on first request."
         )
+    _scan_page_images()
+    _check_stamp_integrity()
     yield
 
 
@@ -286,6 +293,91 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+
+# ---------------------------------------------------------------------------
+# PDF Evidence Viewer (SVS-DMRC-2026-03) -- scanned page images.
+#
+# RULE 2: pdf_page remains the file-lookup key. Image files are named
+# by (document_id, pdf_page). AVAILABLE_PAGES is populated once at
+# startup so a missing render degrades _build_sources() to a chip
+# without a viewer link instead of a broken image, rather than being
+# checked against the filesystem on every request.
+# ---------------------------------------------------------------------------
+
+PAGE_IMAGES_DIR = os.environ.get("PAGE_IMAGES_DIR", "page_images")
+AVAILABLE_PAGES: set = set()  # set[tuple[str, int]]
+
+
+def _scan_page_images() -> None:
+    """Populate AVAILABLE_PAGES from PAGE_IMAGES_DIR at startup."""
+    AVAILABLE_PAGES.clear()
+    if not os.path.isdir(PAGE_IMAGES_DIR):
+        logger.warning("page images dir %s not found - viewer disabled", PAGE_IMAGES_DIR)
+        return
+    for doc_id in os.listdir(PAGE_IMAGES_DIR):
+        doc_dir = os.path.join(PAGE_IMAGES_DIR, doc_id)
+        if not os.path.isdir(doc_dir):
+            continue
+        for fname in os.listdir(doc_dir):
+            if fname.startswith("p") and fname.endswith(".jpg"):
+                try:
+                    AVAILABLE_PAGES.add((doc_id, int(fname[1:5])))
+                except ValueError:
+                    pass
+    logger.info("evidence viewer: %d page images available", len(AVAILABLE_PAGES))
+
+
+def _check_stamp_integrity() -> None:
+    """Warn on empty, duplicate, or non-contiguous scan stamps.
+
+    The stamped scan number forms one continuous global sequence
+    across a volume's chapter files, so gaps and duplicates are a
+    reliable OCR-misread detector. Log warnings only -- never fail
+    startup -- and review the log after each ingestion change.
+    """
+    try:
+        collection = query_module.get_collection()
+        res = collection.get(include=["metadatas"])
+    except Exception as exc:  # pragma: no cover
+        logger.warning("stamp check skipped: %s", exc)
+        return
+
+    seen: Dict[int, tuple] = {}
+    empty = 0
+    for md in res["metadatas"]:
+        stamp = md.get("printed_page") or md.get("stamp_number")
+        loc = (md.get("document_id"), md.get("pdf_page"))
+        if stamp in (None, ""):
+            empty += 1
+            continue
+        try:
+            n = int(str(stamp))
+        except ValueError:
+            logger.warning("non-numeric stamp %r at %s", stamp, loc)
+            continue
+        if n in seen and seen[n] != loc:
+            logger.warning("duplicate stamp %06d: %s vs %s", n, seen[n], loc)
+        seen[n] = loc
+
+    nums = sorted(seen)
+    gaps = [f"{a:06d}->{b:06d}" for a, b in zip(nums, nums[1:]) if b - a > 1]
+    logger.info(
+        "stamp check: %d stamped, %d unstamped chunks, %d gap(s)%s",
+        len(seen), empty, len(gaps), f" {gaps[:5]}" if gaps else "",
+    )
+
+
+if os.path.isdir(PAGE_IMAGES_DIR):
+    app.mount("/pages", StaticFiles(directory=PAGE_IMAGES_DIR), name="pages")
+
+
+@app.get("/pages/manifest")
+def pages_manifest() -> Dict[str, int]:
+    counts: Dict[str, int] = {}
+    for doc_id, _p in AVAILABLE_PAGES:
+        counts[doc_id] = counts.get(doc_id, 0) + 1
+    return counts
 
 
 # ---------------------------------------------------------------------------
@@ -380,13 +472,36 @@ def _build_sources(reranked_candidates: List[Dict[str, Any]]) -> List[SourceItem
         # rather than duplicating (and re-diverging from) the lookup.
         is_boq = metadata.get("chunk_type") == "boq"
         item_number = get_boq_item_number(metadata) if is_boq else metadata.get("item_number")
-        page = get_boq_page_number(metadata) if is_boq else metadata.get("pdf_page")
+
+        # Rule 1: display/citation number = the stamp on the scanned page.
+        scanned = get_scanned_page(metadata)
+
+        # Rule 2: file lookup stays on the PDF index, never the stamp --
+        # stamps are empty on cover pages, arrive as strings with leading
+        # zeros, and can be misread by OCR. A wrong stamp must only ever
+        # produce a wrong label, never a wrong page image.
+        pdf_page = metadata.get("pdf_page")
+        if pdf_page in (None, ""):
+            pdf_page = metadata.get("page_number") if is_boq else None
+
+        doc_id = metadata.get("document_id")
+        image_url = None
+        if doc_id and pdf_page not in (None, ""):
+            try:
+                p = int(pdf_page)
+                if (doc_id, p) in AVAILABLE_PAGES:
+                    image_url = f"/pages/{doc_id}/p{p:04d}.jpg"
+            except (TypeError, ValueError):
+                pass
 
         sources.append(
             SourceItem(
                 clause=metadata.get("clause_no"),
-                page=page,
+                page=None if scanned in (None, "") else str(scanned),
+                pdf_page=int(pdf_page) if pdf_page not in (None, "") else None,
                 document=get_document_name(metadata),
+                document_id=doc_id,
+                image_url=image_url,
                 item_number=item_number,
                 retrieval_source=candidate.get("retrieval_source"),
                 reranker_score=candidate.get("reranker_score"),

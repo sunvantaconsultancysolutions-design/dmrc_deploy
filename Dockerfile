@@ -44,6 +44,7 @@ RUN grep -v -E "^(bitsandbytes|nvidia-nvjitlink-cu13)" requirements.txt > /tmp/r
 COPY src/ ./src/
 COPY data/ ./data/
 COPY chroma_db/ ./chroma_db/
+COPY page_images/ /app/page_images/
 
 # Retrieval caps (from 02_Gemma_Inference_and_Serving.ipynb, cell "Runtime
 # caps on retrieval breadth") -- kept as env vars, not notebook magic.
