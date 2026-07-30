@@ -451,6 +451,30 @@ def build_boq_chunk_records(parsed_json: dict, source_file: str):
     flat_doc_meta = {k: v for k, v in doc_meta.items() if not isinstance(v, dict)}
     document_id = _boq_document_id(doc_meta)
 
+    # --- Evidence-viewer image lookup id (Rule 2) -----------------------
+    # document_id above is intentionally SHARED across boq_part1/2/3
+    # (same contract+schedule = one logical document for retrieval
+    # grouping). But each part file's pdf_page is a LOCAL page number
+    # within that part's own source PDF -- reusing the shared id for
+    # image lookup would collide (part1 page 1 and part2 page 1 would
+    # both resolve to the same image file). image_document_id is scoped
+    # to the actual source PDF instead, one id per real physical file,
+    # so (image_document_id, pdf_page) stays unique. Falls back to the
+    # shared document_id when source_pdf isn't known (e.g. the ADDENDUM
+    # part, which has no source_pdf on file) -- with no matching entry
+    # in AVAILABLE_PAGES, that chunk's chip simply renders without a
+    # "view page" link, same graceful-degradation path as any other
+    # unrendered page (see WP-8 acceptance test T-8). NOTE: previously
+    # this "document_id" field was never written into BOQ chunk
+    # metadata at all (only used locally to build chunk_id), so
+    # _build_sources()'s viewer lookup (metadata.get("document_id"))
+    # always returned None for BOQ chunks -- that is the actual bug
+    # this change fixes, not just the collision.
+    source_pdf = flat_doc_meta.get("source_pdf")
+    image_document_id = (
+        f"BOQ-{_slugify(source_pdf.rsplit('.', 1)[0])}" if source_pdf else document_id
+    )
+
     records = []
     document_sequence = 0
     chunk_number = 0
@@ -521,6 +545,7 @@ def build_boq_chunk_records(parsed_json: dict, source_file: str):
                 "source_file": source_file,
                 "page_label": page_label,
                 "pdf_page": pdf_page,
+                "document_id": image_document_id,  # NEW -- Rule 2 viewer lookup key
                 "chunk_type": "boq",
                 "item_type": item_type,
                 "s_no": s_no,
