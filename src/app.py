@@ -79,6 +79,16 @@ from .gemma_inference import generate_answer, get_gemma_model
 from .gemma_inference import MAX_NEW_TOKENS as DETAILED_MAX_NEW_TOKENS
 from . import gemma_inference as gemma_module
 
+# ---------------------------------------------------------------------------
+# TASK 4 -- Query-intent router (new module; imported here so it can be
+# called in the /ask endpoint before hybrid_search()).  The router is a
+# pure classification function: it does not call any retrieval code, does
+# not load any model, and does not change any existing retrieval logic.
+# Its only effect is to pass a metadata_filter dict to hybrid_search()
+# when the query intent is unambiguously CLAUSE or BOQ.
+# ---------------------------------------------------------------------------
+from .query_router import classify_query
+
 # Demo-day performance change: most questions now get the concise
 # (5-8 bullet, ~150-250 word) instructions from prompt_engineering.py,
 # which need far fewer generated tokens than the original long-form
@@ -187,8 +197,18 @@ class SourceItem(BaseModel):
     pdf_page: Optional[int] = None  # NEW: internal file-lookup key (Rule 2)
     document: Optional[str] = None
     document_id: Optional[str] = None  # NEW
-    image_url: Optional[str] = None  # NEW: /pages/{doc_id}/pNNNN.jpg
-    figure_urls: Optional[list] = None  # NEW: figures found on this page
+    image_url: Optional[str] = None  # /pages/{doc_id}/pNNNN.jpg
+    figure_urls: Optional[list] = None  # figures found on this page
+    # TASK 2 -- neighboring page image URLs.
+    # prev_image_url and next_image_url carry the /pages/{doc_id}/p{N-1:04d}.jpg
+    # and /pages/{doc_id}/p{N+1:04d}.jpg URLs respectively, when those
+    # rendered files exist on disk (verified against AVAILABLE_PAGES at
+    # request time, same check as image_url). Both are None when the
+    # adjacent page has no render (first/last page, or unrendered source).
+    # These are NEW optional fields; any existing client that ignores them
+    # keeps working unchanged.
+    prev_image_url: Optional[str] = None  # TASK 2: /pages/{doc_id}/p{pdf_page-1:04d}.jpg
+    next_image_url: Optional[str] = None  # TASK 2: /pages/{doc_id}/p{pdf_page+1:04d}.jpg
     item_number: Optional[str] = None
     retrieval_source: Optional[str] = None
     reranker_score: Optional[float] = None
@@ -202,6 +222,10 @@ class SourceItem(BaseModel):
     # any existing client that ignores this new field keeps working
     # unchanged.
     chunk_type: Optional[str] = None
+    # TASK 4 -- exposes the routing decision for debug / frontend display.
+    # "clause" | "boq" | "general" | "exact_clause" | "exact_boq"
+    # Optional/back-compat: None when not applicable (exact-match paths).
+    query_intent: Optional[str] = None
 
 
 class AnswerResponse(BaseModel):
@@ -213,6 +237,11 @@ class AnswerResponse(BaseModel):
     answer: str
     sources: List[SourceItem]
     confidence: Optional[float] = None
+    # TASK 4 -- top-level routing metadata for callers that want to know
+    # which retrieval pool was searched. Optional so existing clients
+    # that ignore it keep working unchanged.
+    query_intent: Optional[str] = None
+    routing_reason: Optional[str] = None
 
 
 class HealthResponse(BaseModel):
@@ -325,6 +354,24 @@ app.add_middleware(
 # startup so a missing render degrades _build_sources() to a chip
 # without a viewer link instead of a broken image, rather than being
 # checked against the filesystem on every request.
+#
+# TASK 1 FIX: the BOQ image_url previously returned None for every BOQ
+# chunk because the page_images/ directory names (e.g.
+# "BOQ-CONTRACT-AGREEMENT-CE-10-AND-11-LOT-4-VOL-3-28-37") did not match
+# the document_id values in ChromaDB (e.g.
+# "BOQ-CONTRACT-AGREEMENT-CE-10-CE-11-LOT-4-VOL-3-28-37").  The fix is
+# in two parts:
+#   1. scripts/render_pages.py now derives BOQ directory names via
+#      _slugify(pdf_filename_stem), which is identical to what
+#      metadata_loader.py computes for image_document_id.  Running
+#      scripts/render_pages.py again produces correctly named directories.
+#   2. scripts/migrate_page_image_dirs.py renames the existing misnamed
+#      directories on disk so that deployments with pre-rendered images
+#      do not need to re-render everything.
+# No changes to this function are needed: _scan_page_images() reads
+# whatever directories exist on disk, so once the directories are
+# correctly named the AVAILABLE_PAGES set automatically contains the
+# right (document_id, pdf_page) pairs.
 # ---------------------------------------------------------------------------
 
 PAGE_IMAGES_DIR = os.environ.get("PAGE_IMAGES_DIR", "page_images")
@@ -407,6 +454,23 @@ def pages_manifest() -> Dict[str, int]:
 # the whole-page renders above. FIGURE_MANIFEST is a dict keyed by
 # (document_id, pdf_page) -> list of figure filenames, loaded once at
 # startup from figure_images/manifest.json (written by that script).
+#
+# TASK 3 STATUS -- figure retrieval is fully implemented in this file and
+# in scripts/extract_page_figures.py; the API endpoints (/figures,
+# /figures/manifest, figure_urls in SourceItem) are all present and
+# functional. However, the source PDFs in this corpus (BE-12/BE-14 Vol-2
+# and CE-10/CE-11 Vol-3) are fully-scanned photocopies: every page is a
+# single large raster image, so PyMuPDF's page.get_images() returns only
+# that full-page scan, which extract_page_figures.py correctly rejects via
+# AREA_RATIO_THRESHOLD (>60% of page area). Running the script produces 0
+# extracted figures.  This is correct behavior: there are no embedded
+# sub-figures to extract. figure_images/manifest.json is therefore empty
+# for this corpus.
+#
+# The implementation is complete; it simply has no assets to serve for the
+# current source documents. When new documents with embedded diagrams are
+# ingested, running scripts/extract_page_figures.py will populate the
+# manifest and activate the feature with no code changes required.
 # ---------------------------------------------------------------------------
 
 import json  # noqa: E402 -- kept as the only json import in this module
@@ -515,7 +579,27 @@ def system_status() -> StatusResponse:
 # Helpers -- building the "sources" list from reranked metadata (12.8)
 # ---------------------------------------------------------------------------
 
-def _build_sources(reranked_candidates: List[Dict[str, Any]]) -> List[SourceItem]:
+def _resolve_page_image_url(doc_id: Optional[str], pdf_page: Any) -> Optional[str]:
+    """Return the /pages/{doc_id}/p{N:04d}.jpg URL if that image exists
+    in AVAILABLE_PAGES, else None. Centralised so _build_sources() can
+    call it for the current page, the previous page, and the next page
+    without repeating the int-cast / AVAILABLE_PAGES check.
+    """
+    if not doc_id or pdf_page in (None, ""):
+        return None
+    try:
+        p = int(pdf_page)
+    except (TypeError, ValueError):
+        return None
+    if (doc_id, p) in AVAILABLE_PAGES:
+        return f"/pages/{doc_id}/p{p:04d}.jpg"
+    return None
+
+
+def _build_sources(
+    reranked_candidates: List[Dict[str, Any]],
+    query_intent: Optional[str] = None,
+) -> List[SourceItem]:
     sources: List[SourceItem] = []
     for candidate in reranked_candidates:
         metadata = candidate.get("metadata") or {}
@@ -555,12 +639,22 @@ def _build_sources(reranked_candidates: List[Dict[str, Any]]) -> List[SourceItem
             pdf_page = metadata.get("page_number") if is_boq else None
 
         doc_id = metadata.get("document_id")
-        image_url = None
-        if doc_id and pdf_page not in (None, ""):
+
+        # Current page image (unchanged from original).
+        image_url = _resolve_page_image_url(doc_id, pdf_page)
+
+        # TASK 2 -- Neighboring page images.
+        # Resolve previous and next pages using the same AVAILABLE_PAGES
+        # check so we only return URLs for images that actually exist on
+        # disk. Both are None when the neighbor page has no render
+        # (first/last page of a document, or an unrendered source).
+        prev_image_url: Optional[str] = None
+        next_image_url: Optional[str] = None
+        if pdf_page not in (None, ""):
             try:
                 p = int(pdf_page)
-                if (doc_id, p) in AVAILABLE_PAGES:
-                    image_url = f"/pages/{doc_id}/p{p:04d}.jpg"
+                prev_image_url = _resolve_page_image_url(doc_id, p - 1)
+                next_image_url = _resolve_page_image_url(doc_id, p + 1)
             except (TypeError, ValueError):
                 pass
 
@@ -584,11 +678,14 @@ def _build_sources(reranked_candidates: List[Dict[str, Any]]) -> List[SourceItem
                 document_id=doc_id,
                 image_url=image_url,
                 figure_urls=figure_urls,
+                prev_image_url=prev_image_url,   # TASK 2
+                next_image_url=next_image_url,   # TASK 2
                 item_number=item_number,
                 retrieval_source=candidate.get("retrieval_source"),
                 reranker_score=candidate.get("reranker_score"),
                 chunk_id=candidate.get("chunk_id") or metadata.get("chunk_id"),
                 chunk_type=metadata.get("chunk_type"),
+                query_intent=query_intent,       # TASK 4
             )
         )
     return sources
@@ -674,11 +771,17 @@ def ask(request: QueryRequest) -> AnswerResponse:
            `s_no`, `item_header_no`, or `section_no`), use that match
            directly and skip hybrid retrieval entirely. Otherwise fall
            through to step 4 exactly as before.
-        4. Hybrid retrieval over ChromaDB + BM25.       -> hybrid_search()
-        5. Rerank the candidates.                       -> rerank()
-        6. Build the final LLM prompt.                  -> build_prompt()
-        7. Generate the answer.                         -> generate_answer()
-        8. Return the answer + sources as JSON.
+        4. TASK 4: Query-intent routing.               -> query_router.classify_query()
+           Classify the query as CLAUSE, BOQ, or GENERAL and derive a
+           metadata_filter for hybrid_search(). Only runs when neither
+           fast path fired (steps 2-3). Existing behaviour is preserved
+           for all exact-match paths; routing only changes the
+           metadata_filter passed to hybrid_search().
+        5. Hybrid retrieval over ChromaDB + BM25.       -> hybrid_search()
+        6. Rerank the candidates.                       -> rerank()
+        7. Build the final LLM prompt.                  -> build_prompt()
+        8. Generate the answer.                         -> generate_answer()
+        9. Return the answer + sources as JSON.
     """
     query_text = request.query.strip()
     if not query_text:
@@ -800,13 +903,50 @@ def ask(request: QueryRequest) -> AnswerResponse:
     # on this path instead.
     exact_match = bool(candidates)
 
+    # TASK 4 -- Query-intent routing for free-text queries.
+    #
+    # classify_query() is called ONLY when the exact-match fast paths
+    # above found nothing -- those paths already know the intent
+    # (clause or BOQ) from the explicit identifier, and adding a filter
+    # would be redundant and could only narrow the already-correct result.
+    #
+    # For free-text queries, the router classifies the intent and returns
+    # a metadata_filter that restricts hybrid_search() to the relevant
+    # chunk_type. This prevents clause and BOQ chunks from competing in
+    # one pool for unambiguous queries.  When the intent is GENERAL (no
+    # clear signal), metadata_filter is None and hybrid_search() runs
+    # unfiltered, exactly as before.
+    routing_intent = "exact_clause" if (exact_match and clause_no) else (
+        "exact_boq" if exact_match else None
+    )
+    routing_reason: Optional[str] = None
+    retrieval_filter: Optional[dict] = None
+
     if not exact_match:
+        try:
+            intent_result = classify_query(query_text)
+            routing_intent = intent_result.intent
+            routing_reason = intent_result.reason
+            retrieval_filter = intent_result.metadata_filter
+            if RAG_DEBUG:
+                logger.info(
+                    "Query router: intent=%r  filter=%r  reason=%r",
+                    routing_intent, retrieval_filter, routing_reason,
+                )
+        except Exception:
+            # Routing is a best-effort enhancement; if it fails for any
+            # reason, fall through to the unfiltered search that was
+            # already working.
+            logger.exception("Query router failed for query %r; continuing unfiltered.", query_text)
+            retrieval_filter = None
+
         try:
             candidates = hybrid_search(
                 query_text,
                 top_k_dense=DENSE_TOP_K,
                 top_k_bm25=BM25_TOP_K,
                 final_top_k=MERGED_CANDIDATE_POOL,
+                metadata_filter=retrieval_filter,   # TASK 4: may be None (unfiltered) or chunk_type filter
             )
         except Exception as exc:
             logger.error("Hybrid retrieval failed for query: %r", query_text, exc_info=True)
@@ -845,6 +985,8 @@ def ask(request: QueryRequest) -> AnswerResponse:
                 answer=NO_CONTEXT_ANSWER,
                 sources=[],
                 confidence=confidence_info["top_score"],
+                query_intent=routing_intent,
+                routing_reason=routing_reason,
             )
 
         # ------------------------------------------------------------
@@ -891,7 +1033,13 @@ def ask(request: QueryRequest) -> AnswerResponse:
     # 11.14 Handling Missing Information -- no reason to build a prompt
     # (or call an LLM) if retrieval found nothing at all.
     if not has_usable_context(reranked):
-        return AnswerResponse(answer=NO_CONTEXT_ANSWER, sources=[], confidence=None)
+        return AnswerResponse(
+            answer=NO_CONTEXT_ANSWER,
+            sources=[],
+            confidence=None,
+            query_intent=routing_intent,
+            routing_reason=routing_reason,
+        )
 
     # Demo-day change: default every answer to the concise (5-8 bullet,
     # ~150-250 word) instructions and a lower generation cap, unless the
@@ -945,9 +1093,11 @@ def ask(request: QueryRequest) -> AnswerResponse:
 
     return AnswerResponse(
         answer=answer,
-        sources=_build_sources(reranked),
+        sources=_build_sources(reranked, query_intent=routing_intent),
         # BUGFIX: was hardcoded None even though reranker_score is
         # available on every entry -- now reports the strongest score
         # actually backing this answer.
         confidence=(max((c.get("reranker_score") or 0.0) for c in reranked) if reranked else None),
+        query_intent=routing_intent,
+        routing_reason=routing_reason,
     )
