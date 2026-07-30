@@ -464,6 +464,8 @@ def build_boq_chunk_records(parsed_json: dict, source_file: str):
         # page index that would collide across the three part files) is
         # what keeps chunk_id globally unique.
         page_ref = (page.get("source_file") or "").replace(".png", "").replace(".jpg", "")
+        _pdf_page_match = re.search(r"page_(\d+)", page.get("source_file") or "")
+        pdf_page = int(_pdf_page_match.group(1)) if _pdf_page_match else None
         page_stamps = page.get("stamps_seals", []) or []
 
         # Running context set by the most recent header row(s) seen on
@@ -518,6 +520,7 @@ def build_boq_chunk_records(parsed_json: dict, source_file: str):
                 **flat_doc_meta,
                 "source_file": source_file,
                 "page_label": page_label,
+                "pdf_page": pdf_page,
                 "chunk_type": "boq",
                 "item_type": item_type,
                 "s_no": s_no,

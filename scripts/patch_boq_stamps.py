@@ -17,14 +17,22 @@ PR description / implementation notes for the ingestion-side fix
 needed first.
 """
 
-import glob, json, sys
+import glob, json, re, sys
 sys.path.insert(0, ".")
 from src.storage import get_collection
 
+_SOURCE_PAGE_RE = re.compile(r"page_(\d+)")
+
 
 def page_key(p):
-    # BOQ page objects may carry pdf_page or page_number depending on
-    # the part file; mirror get_boq_page_number()'s preference order.
+    # BOQ page objects never carried a bare pdf_page/page_number field --
+    # only source_file (e.g. "page_007.png"). Derive the integer page
+    # index from that filename instead, matching the same convention
+    # metadata_loader.py::build_boq_chunk_records() and
+    # patch_boq_pdf_page.py already use for the chunk side.
+    m = _SOURCE_PAGE_RE.search(p.get("source_file") or "")
+    if m:
+        return int(m.group(1))
     return p.get("pdf_page") or p.get("page_number")
 
 
@@ -39,9 +47,14 @@ def build_stamp_map():
         for page in data.get("pages", []):
             stamp = page.get("stamp_number")
             key = page_key(page)
-            if stamp and key is not None:
+            # Reject non-numeric stamp text (e.g. "illegible", "not legible
+            # in text layer (image-based)") -- writing that into
+            # stamp_number would surface as a broken citation like "Page
+            # not legible in text layer...". Only a real stamped number
+            # (digits, possibly with leading zeros) is usable.
+            if stamp and key is not None and re.fullmatch(r"\d+", str(stamp).strip()):
                 for s in src_names:
-                    stamp_map[(s, int(key))] = str(stamp)
+                    stamp_map[(s, int(key))] = str(stamp).strip()
     return stamp_map
 
 
@@ -56,8 +69,15 @@ def main():
         if key is None or src is None:
             continue
         stamp = stamp_map.get((src, int(key)))
-        if stamp and md.get("stamp_number") != stamp:
+        existing = md.get("stamp_number")
+        if stamp and existing != stamp:
             md["stamp_number"] = stamp
+            ids.append(cid); metas.append(md); patched += 1
+        elif not stamp and existing and not re.fullmatch(r"\d+", str(existing).strip()):
+            # Clear a leftover non-numeric value from a prior run (e.g.
+            # "not legible in text layer (image-based)") -- get_scanned_page()
+            # falls back to pdf_page cleanly once stamp_number is absent.
+            md["stamp_number"] = None
             ids.append(cid); metas.append(md); patched += 1
     if ids:
         col.update(ids=ids, metadatas=metas)
