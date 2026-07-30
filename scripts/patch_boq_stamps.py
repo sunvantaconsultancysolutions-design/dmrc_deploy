@@ -4,20 +4,27 @@ Matches BOQ chunks to boq_part*.json pages by (source_file, page key)
 and writes the page's stamp_number into chunk metadata. Embeddings are
 untouched. Run once: python scripts/patch_boq_stamps.py
 
-CAVEAT (as of this branch): the BOQ chunk metadata currently produced
-by src/metadata_loader.py::build_boq_chunk_records() does not carry a
-"pdf_page" or "page_number" field at all -- only "page_label",
-"source_file" (the boq_part*.json filename, not the per-page image),
-and "stamps_seals". The page_key() matching below mirrors what
-get_boq_page_number() in prompt_engineering.py already reads, so this
-script is correct *once* pdf_page/page_number is added to BOQ chunk
-metadata at ingestion time. Until then this script will report 0
-patched chunks -- that is expected, not a bug in this script. See the
-PR description / implementation notes for the ingestion-side fix
-needed first.
+UPDATE: pdf_page is now populated at ingestion time by
+src/metadata_loader.py::build_boq_chunk_records() (confirmed present in
+production chunk metadata, e.g. via src/validate_db.py's sample
+output), so the earlier "0 patched, pdf_page doesn't exist yet" caveat
+below no longer applies -- page_key() matching works correctly today.
+
+The real remaining gap this script handles: boq_part*.json's
+stamp_number field is NOT always a bare digit string. Real formats
+found in the data include "illegible", "not legible in text layer
+(image-based)", "top: 000013; bottom: 0019" (two separate physical
+stamps per page), and "top: illegible (approx. 000016); bottom:
+illegible (approx. 000022)" (an OCR guess, explicitly marked as such).
+extract_stamp() below rejects any segment containing "illegible",
+"approx", or "not legible" (all explicit non-reads) and otherwise
+prefers the "bottom" stamp over "top" when a page has both -- per Rule
+2 (a wrong stamp must only ever produce a wrong LABEL, never a wrong
+page image), a guessed digit is worse than no stamp at all, so
+ambiguous values are skipped rather than guessed.
 """
 
-import glob, json, re, sys
+import glob, json, os, re, sys
 sys.path.insert(0, ".")
 from src.storage import get_collection
 
@@ -36,25 +43,61 @@ def page_key(p):
     return p.get("pdf_page") or p.get("page_number")
 
 
+def _segment_ok(segment: str) -> bool:
+    s = segment.lower()
+    return "illegible" not in s and "approx" not in s and "not legible" not in s
+
+
+def _segment_digits(segment: str):
+    if not _segment_ok(segment):
+        return None
+    m = re.search(r"\d{4,8}", segment)
+    return m.group(0) if m else None
+
+
+def extract_stamp(raw):
+    """Recover a usable stamp digit string from stamp_number's free-text
+    value, or None if nothing in it is confidently readable. See the
+    module docstring above for the real-data formats this handles.
+    """
+    if not raw:
+        return None
+    raw_lower = str(raw).lower().strip()
+    if raw_lower == "illegible" or "not legible" in raw_lower:
+        return None
+
+    segments = str(raw).split(";")
+    if len(segments) == 1:
+        return _segment_digits(segments[0])
+
+    bottom_seg = next((s for s in segments if "bottom" in s.lower()), None)
+    top_seg = next((s for s in segments if "top" in s.lower()), None)
+    if bottom_seg:
+        d = _segment_digits(bottom_seg)
+        if d:
+            return d
+    if top_seg:
+        d = _segment_digits(top_seg)
+        if d:
+            return d
+    return None
+
+
 def build_stamp_map():
     stamp_map = {}
     for path in sorted(glob.glob("data/boq_part*.json")):
         data = json.load(open(path, encoding="utf-8"))
-        src_names = {path.split("/")[-1]}
+        src_names = {os.path.basename(path)}
         meta_src = (data.get("document_metadata") or {}).get("source_file")
         if meta_src:
             src_names.add(meta_src)
         for page in data.get("pages", []):
-            stamp = page.get("stamp_number")
+            raw_stamp = page.get("stamp_number")
             key = page_key(page)
-            # Reject non-numeric stamp text (e.g. "illegible", "not legible
-            # in text layer (image-based)") -- writing that into
-            # stamp_number would surface as a broken citation like "Page
-            # not legible in text layer...". Only a real stamped number
-            # (digits, possibly with leading zeros) is usable.
-            if stamp and key is not None and re.fullmatch(r"\d+", str(stamp).strip()):
+            stamp = extract_stamp(raw_stamp)
+            if stamp and key is not None:
                 for s in src_names:
-                    stamp_map[(s, int(key))] = str(stamp).strip()
+                    stamp_map[(s, int(key))] = stamp
     return stamp_map
 
 
@@ -73,8 +116,8 @@ def main():
         if stamp and existing != stamp:
             md["stamp_number"] = stamp
             ids.append(cid); metas.append(md); patched += 1
-        elif not stamp and existing and not re.fullmatch(r"\d+", str(existing).strip()):
-            # Clear a leftover non-numeric value from a prior run (e.g.
+        elif not stamp and existing and not re.fullmatch(r"\d{4,8}", str(existing).strip()):
+            # Clear a leftover free-text value from a prior run (e.g.
             # "not legible in text layer (image-based)") -- get_scanned_page()
             # falls back to pdf_page cleanly once stamp_number is absent.
             md["stamp_number"] = None
@@ -84,8 +127,11 @@ def main():
     print(f"BOQ chunks patched: {patched} / {len(res['ids'])}")
     if patched == 0:
         print(
-            "NOTE: 0 patched is expected today -- BOQ chunk metadata has no "
-            "pdf_page/page_number field yet (see this file's module docstring)."
+            "NOTE: 0 patched -- either every BOQ chunk already has the "
+            "correct stamp_number (re-run is a no-op), or none of the "
+            "boq_part*.json pages backing these chunks have a recoverable "
+            "stamp (check extract_stamp() output per page if this is "
+            "unexpected)."
         )
 
 
