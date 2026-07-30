@@ -180,6 +180,7 @@ class SourceItem(BaseModel):
     document: Optional[str] = None
     document_id: Optional[str] = None  # NEW
     image_url: Optional[str] = None  # NEW: /pages/{doc_id}/pNNNN.jpg
+    figure_urls: Optional[list] = None  # NEW: figures found on this page
     item_number: Optional[str] = None
     retrieval_source: Optional[str] = None
     reranker_score: Optional[float] = None
@@ -258,6 +259,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
             "Gemma 3 warm-up failed; will retry lazily on first request."
         )
     _scan_page_images()
+    _load_figure_manifest()
     _check_stamp_integrity()
     yield
 
@@ -381,6 +383,54 @@ def pages_manifest() -> Dict[str, int]:
 
 
 # ---------------------------------------------------------------------------
+# Figure/diagram images (scripts/extract_page_figures.py) -- distinct from
+# the whole-page renders above. FIGURE_MANIFEST is a dict keyed by
+# (document_id, pdf_page) -> list of figure filenames, loaded once at
+# startup from figure_images/manifest.json (written by that script).
+# ---------------------------------------------------------------------------
+
+import json  # noqa: E402 -- kept as the only json import in this module
+
+FIGURE_IMAGES_DIR = os.environ.get("FIGURE_IMAGES_DIR", "figure_images")
+FIGURE_MANIFEST: Dict[tuple, list] = {}  # {(document_id, pdf_page): [filenames]}
+
+
+def _load_figure_manifest() -> None:
+    """Populate FIGURE_MANIFEST from figure_images/manifest.json at
+    startup. Missing file/dir degrades to an empty manifest -- same
+    graceful-degradation convention as _scan_page_images() above, since
+    a document with no extracted figures is the common case, not an
+    error.
+    """
+    FIGURE_MANIFEST.clear()
+    manifest_path = os.path.join(FIGURE_IMAGES_DIR, "manifest.json")
+    if not os.path.isfile(manifest_path):
+        logger.warning("figure manifest %s not found - figures disabled", manifest_path)
+        return
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        raw = json.load(f)
+    total = 0
+    for doc_id, entries in raw.items():
+        for entry in entries:
+            key = (doc_id, entry["pdf_page"])
+            FIGURE_MANIFEST.setdefault(key, []).append(entry["filename"])
+            total += 1
+    logger.info("evidence viewer: %d figures available across %d documents", total, len(raw))
+
+
+if os.path.isdir(FIGURE_IMAGES_DIR):
+    app.mount("/figures", StaticFiles(directory=FIGURE_IMAGES_DIR), name="figures")
+
+
+@app.get("/figures/manifest")
+def figures_manifest() -> Dict[str, int]:
+    counts: Dict[str, int] = {}
+    for (doc_id, _pdf_page), filenames in FIGURE_MANIFEST.items():
+        counts[doc_id] = counts.get(doc_id, 0) + len(filenames)
+    return counts
+
+
+# ---------------------------------------------------------------------------
 # GET / -- 12.6 Health Check
 # ---------------------------------------------------------------------------
 
@@ -494,6 +544,17 @@ def _build_sources(reranked_candidates: List[Dict[str, Any]]) -> List[SourceItem
             except (TypeError, ValueError):
                 pass
 
+        # Parallel to image_url above, but for embedded figures/diagrams
+        # (scripts/extract_page_figures.py) rather than the whole-page
+        # scan render. Uses the raw (unvalidated-against-AVAILABLE_PAGES)
+        # pdf_page directly since FIGURE_MANIFEST.get() on a missing key
+        # simply returns [], same graceful-degradation convention as
+        # AVAILABLE_PAGES above.
+        figure_urls = [
+            f"/figures/{doc_id}/{fname}"
+            for fname in FIGURE_MANIFEST.get((doc_id, pdf_page), [])
+        ] if doc_id and pdf_page not in (None, "") else []
+
         sources.append(
             SourceItem(
                 clause=metadata.get("clause_no"),
@@ -502,6 +563,7 @@ def _build_sources(reranked_candidates: List[Dict[str, Any]]) -> List[SourceItem
                 document=get_document_name(metadata),
                 document_id=doc_id,
                 image_url=image_url,
+                figure_urls=figure_urls,
                 item_number=item_number,
                 retrieval_source=candidate.get("retrieval_source"),
                 reranker_score=candidate.get("reranker_score"),

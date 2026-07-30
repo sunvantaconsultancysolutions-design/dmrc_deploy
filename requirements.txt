@@ -43,3 +43,17 @@ bitsandbytes>=0.43.0
 
 # PDF Evidence Viewer (WP-1): render source contract PDFs to page images.
 pymupdf
+
+# PDF parsing pipeline (scripts/parse_pdf_to_clauses.py): text-layer
+# extraction path.
+pdfplumber==0.11.4
+
+# PDF parsing pipeline (scripts/parse_pdf_to_clauses.py): OCR fallback path
+# for scanned PDFs with no text layer (this is the path BE-12/BE-14 needs --
+# see that script's module docstring). Also requires the tesseract binary
+# itself to be installed on the host/container (not a pip package):
+#   Ubuntu/Debian: apt-get install tesseract-ocr
+#   Windows:       https://github.com/UB-Mannheim/tesseract/wiki
+#   macOS:         brew install tesseract
+pytesseract==0.3.13
+pillow==10.4.0
