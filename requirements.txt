@@ -35,7 +35,7 @@ sentencepiece==0.2.2
 # why `python -m src.hybrid_retriever` failed with ModuleNotFoundError.
 rank-bm25==0.2.2
 
-# 4-bit quantized Gemma 3 loading (gemma_inference.py). nvidia-nvjitlink-cu13
+# 4-bit quantized Gemma 2 9B loading (gemma_inference.py). nvidia-nvjitlink-cu13
 # works around bitsandbytes-foundation#1905 (libnvJitLink.so.13 dlopen
 # failure) on some Colab CUDA builds.
 bitsandbytes>=0.43.0

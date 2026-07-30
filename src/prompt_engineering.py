@@ -1,15 +1,21 @@
 """
 prompt_engineering.py
 
-Chapter 11 -- Gemma 3 Prompt Engineering.
+Chapter 11 -- Prompt Engineering.
 
 Pure prompt CONSTRUCTION only: no model loading, no inference. This
 module takes the merged candidate list already produced by Chapter 9's
 hybrid_retriever.hybrid_search() and turns it into the exact prompt
-text that gets handed to Gemma 3 in generate_answer.py. Kept separate
-from model loading (same split as batch_embed.py/embed_single.py) so
-the prompt logic can be built and unit-tested without a GPU or the
-~24GB Gemma 3 12B checkpoint in memory.
+text that gets handed to Gemma 2 9B in gemma_inference.py's
+generate_answer(). Kept separate from model loading (same split as
+batch_embed.py/embed_single.py) so the prompt logic can be built and
+unit-tested without a GPU or the model checkpoint in memory.
+
+DOC FIX: this module originally targeted Gemma 3; gemma_inference.py
+documents a deliberate later swap to google/gemma-2-9b-it (a different,
+text-only architecture -- see that module's own "MODEL CHANGE" note).
+This docstring is updated to match; no prompt-construction logic here
+changed as a result of that swap.
 
 ------------------------------------------------------------------------
 11.4 Prompt Components

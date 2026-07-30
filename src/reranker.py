@@ -252,13 +252,13 @@ def rerank(
 # trusted in production -- override via the env vars rather than
 # editing the constants directly.
 #
-# TODO: this calibration should be backed by a repeatable script (e.g.
-# a scripts/calibrate_confidence.py that replays real query logs
-# through evaluate_confidence() and reports false-positive/negative
-# rates for candidate MIN_ABSOLUTE_CONFIDENCE / MIN_SEPARATION_MARGIN
-# values). This module review has no visibility into whether such a
-# script already exists elsewhere in the project -- if not, one should
-# be added before these defaults are trusted in production.
+# DOC FIX: scripts/calibrate_confidence.py already exists and does
+# exactly what this section used to ask for -- it replays real queries
+# through evaluate_confidence() below, compares the current thresholds
+# against the pre-HIGH_CONFIDENCE_ABSOLUTE logic, and checks top-result
+# correctness against an optional expected_clause. Run it against real
+# query logs before trusting/re-tuning the defaults below; see that
+# script's own docstring for usage.
 # ---------------------------------------------------------------------------
 
 MIN_ABSOLUTE_CONFIDENCE = float(os.environ.get("RAG_MIN_CONFIDENCE", "0.10"))

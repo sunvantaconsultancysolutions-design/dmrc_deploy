@@ -35,6 +35,17 @@ const DEFAULT_ASK_TIMEOUT_MS = 120_000;
 async function parseErrorDetail(res) {
   try {
     const body = await res.json();
+    // BUGFIX: FastAPI/Pydantic validation errors (422, e.g. the /ask
+    // query length cap) return `detail` as a LIST of {loc, msg, type}
+    // objects, not a string -- every other error in this app (400/500
+    // HTTPExceptions) returns a plain string. Passed straight through,
+    // an array stringifies to "[object Object]" wherever it's later
+    // interpolated (see App.jsx's catch block), which reads as a dead
+    // backend/CORS problem instead of "query too long." Join the
+    // human-readable `msg` field(s) instead when detail is a list.
+    if (Array.isArray(body.detail)) {
+      return body.detail.map((d) => d.msg || JSON.stringify(d)).join("; ");
+    }
     return body.detail || res.statusText;
   } catch {
     return res.statusText;
