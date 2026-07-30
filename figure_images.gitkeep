@@ -1,0 +1,7 @@
+# Keeps this directory present in git even when empty, so the
+# Dockerfile's `COPY figure_images/ /app/figure_images/` line always
+# has a source to copy (a nonexistent path fails a Docker COPY
+# outright -- this is what was breaking the GHCR build). Populate this
+# directory by running scripts/extract_page_figures.py before building
+# the image; app.py only mounts /figures if the directory exists at
+# runtime, so an empty directory here is a safe no-op default.
