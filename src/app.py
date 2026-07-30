@@ -47,7 +47,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from . import retrieval_caps  # side-effect import, must run before
                                 # hybrid_search/rerank/expand_with_siblings/
@@ -159,9 +159,17 @@ RERANK_TOP_N = 12       # was 10 -- Table 9.2 / 14.7: Final Re-ranked / Re-ranke
 class QueryRequest(BaseModel):
     """12.7 Request Model. `query` is the only required field, matching
     the design doc's example exactly: a bare {"query": "..."} request.
+
+    SECURITY/COST FIX (post-audit): previously had no length cap, so a
+    pathologically long query could reach the tokenizer/reranker
+    uncapped, inflating latency and cost for a single request. 2000
+    characters is generous for any real contract question (the longest
+    realistic query -- quoting a clause back verbatim -- is nowhere
+    close to this) while bounding the worst case. FastAPI/Pydantic
+    reject over-length requests with a 422 automatically.
     """
 
-    query: str
+    query: str = Field(..., max_length=2000)
 
 
 class SourceItem(BaseModel):
@@ -261,6 +269,18 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     _scan_page_images()
     _load_figure_manifest()
     _check_stamp_integrity()
+    # SECURITY FIX (post-audit): the open-by-default /admin/reload-bm25
+    # tradeoff is deliberate for a single private RunPod pod (see that
+    # endpoint's own comment), but nothing previously surfaced the fact
+    # that it's currently open. A log line at startup is cheap insurance
+    # against an operator forgetting to set ADMIN_API_KEY before a
+    # deploy that's no longer single-tenant/private.
+    if not ADMIN_API_KEY:
+        logger.warning(
+            "ADMIN_API_KEY is not set -- /admin/reload-bm25 is open with no "
+            "authentication. Set ADMIN_API_KEY before deploying anywhere "
+            "other than a single, private, trusted-network pod."
+        )
     yield
 
 

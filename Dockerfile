@@ -45,6 +45,17 @@ COPY src/ ./src/
 COPY data/ ./data/
 COPY chroma_db/ ./chroma_db/
 COPY page_images/ /app/page_images/
+# BUGFIX (post-audit): this line was missing entirely, so app.py's
+# conditional `/figures` StaticFiles mount (only mounted if
+# FIGURE_IMAGES_DIR exists, see app.py) never found anything in any
+# deployed image -- the figures feature was silently dead regardless
+# of what scripts/extract_page_figures.py generated locally. Mirrors
+# the page_images/ line above. Safe to keep even though figure_images/
+# is currently empty/absent for this corpus: the COPY is a no-op if
+# the directory doesn't exist at build time in BuildKit, but keep the
+# directory present (even empty, with a .gitkeep) so this line has
+# something to copy once figures are generated.
+COPY figure_images/ /app/figure_images/
 
 # Retrieval caps (from 02_Gemma_Inference_and_Serving.ipynb, cell "Runtime
 # caps on retrieval breadth") -- kept as env vars, not notebook magic.

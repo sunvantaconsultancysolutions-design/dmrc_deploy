@@ -8,9 +8,12 @@
 //                      chromadb_connected }
 //
 // SourceItem: { clause, page, pdf_page, document, document_id, image_url,
-//               item_number, retrieval_source, reranker_score, chunk_id,
-//               chunk_type } -- every field is optional, since not all
-// chunk types (contract clause vs. BOQ row) carry all of them.
+//               figure_urls, item_number, retrieval_source, reranker_score,
+//               chunk_id, chunk_type } -- every field is optional, since not
+// all chunk types (contract clause vs. BOQ row) carry all of them.
+// figure_urls is currently always empty/null for the deployed corpus
+// (no figures have been extracted yet) but the field exists on the wire
+// and PageViewer.jsx renders it when present -- see PageViewer.jsx.
 //
 // PDF Evidence Viewer (SVS-DMRC-2026-03): `page` is now the number
 // STAMPED on the scanned page (a string, e.g. "9"), not the PDF's own

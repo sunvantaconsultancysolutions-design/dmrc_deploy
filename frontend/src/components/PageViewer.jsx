@@ -49,6 +49,30 @@ export default function PageViewer({ source, onClose }) {
         <img src={url} alt={`Scanned contract page ${source.page ?? pdfPage}`}
           onError={(e) => { e.currentTarget.style.opacity = 0.25; }} />
       </div>
+      {/* FEATURE: figure_urls is populated backend-side (app.py's
+          SourceItem model) but previously had zero frontend consumer.
+          Renders only when the cited page actually has extracted
+          figures -- currently empty for this corpus, so this stays
+          invisible until scripts/extract_page_figures.py output ships
+          with a build (see Dockerfile figure_images/ COPY). */}
+      {Array.isArray(source.figure_urls) && source.figure_urls.length > 0 && (
+        <div className="page-viewer__figures">
+          <span className="page-viewer__figures-label">
+            Figures on this page ({source.figure_urls.length})
+          </span>
+          <div className="page-viewer__figures-grid">
+            {source.figure_urls.map((figUrl, i) => (
+              <img
+                key={figUrl ?? i}
+                src={`${API_URL}${figUrl}`}
+                alt={`Figure ${i + 1} from ${source.document || source.document_id}`}
+                className="page-viewer__figure-thumb"
+                onError={(e) => { e.currentTarget.style.display = "none"; }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </aside>
   );
 }
