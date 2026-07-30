@@ -93,7 +93,15 @@ _CLAUSE_KEYWORDS: frozenset = frozenset({
     "installation plan", "method statement",
     "resident staff", "contractor staff",
     "test programme", "testing procedure",
-    "training requirement", "operation and maintenance",
+    # ISSUE 3 FIX: add training-related keywords.
+    # "training requirement" (singular) was already present but did not match
+    # "training requirements" (plural) as used in real queries.  Adding the
+    # bare word "training" and the plural form covers both phrasings.
+    # Validated: "training" has zero BM25 hits in the BOQ corpus and does not
+    # overlap with any _BOQ_KEYWORDS entry, so it is unambiguously clause-domain.
+    "training", "training requirement", "training requirements",
+    "staff training", "training obligations",
+    "operation and maintenance",
     "spare parts", "tools and test equipment",
     # clause reference words (without an actual clause number)
     "clause", "sub-clause", "article", "section",

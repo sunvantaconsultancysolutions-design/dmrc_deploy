@@ -12,7 +12,7 @@ single-chunk and batch embedding only ever holds one ~2.27GB model
 instance in memory instead of two.
 """
 
-from batch_embed import get_model
+from .batch_embed import get_model
 
 
 def embed_chunk(text: str):

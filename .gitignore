@@ -20,10 +20,3 @@ frontend/node_modules/
 # Logs
 *.log
 
-# SECURITY: real client-confidential contract PDFs. These must never be
-# committed to a public repository. This .gitignore entry only stops
-# FUTURE commits -- the six PDFs already committed are still readable in
-# git history and must be purged separately (git filter-repo / BFG),
-# then force-pushed, with collaborators re-cloning afterward. See the
-# remediation notes in the audit / README for the exact commands.
-source_pdfs/

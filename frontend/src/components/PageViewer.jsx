@@ -21,10 +21,30 @@ export default function PageViewer({ source, onClose }) {
   }
 
   const onCited = pdfPage === source.pdf_page;
+  const onPrev  = pdfPage === source.pdf_page - 1;
+  const onNext  = pdfPage === source.pdf_page + 1;
   const pad = (n) => `p${String(n).padStart(4, "0")}.jpg`;
+
+  // ISSUE 4 FIX: use API-supplied prev_image_url / next_image_url when
+  // available, falling back to the manually-constructed path for any other
+  // page (or when the API does not return those fields).
+  //
+  // Priority:
+  //   cited page  -> source.image_url          (unchanged)
+  //   prev page   -> source.prev_image_url      if truthy, else manual
+  //   next page   -> source.next_image_url      if truthy, else manual
+  //   other page  -> manual /pages/{doc}/{pad}  (unchanged)
+  //
+  // Backward compatibility: older server responses without prev/next_image_url
+  // return undefined/null for those fields; the falsy check falls through to
+  // the manual construction that already worked, so no regression is possible.
   const url = onCited
     ? `${API_URL}${source.image_url}`
-    : `${API_URL}/pages/${source.document_id}/${pad(pdfPage)}`;
+    : onPrev && source.prev_image_url
+      ? `${API_URL}${source.prev_image_url}`
+      : onNext && source.next_image_url
+        ? `${API_URL}${source.next_image_url}`
+        : `${API_URL}/pages/${source.document_id}/${pad(pdfPage)}`;
 
   return (
     <aside className="page-viewer">
