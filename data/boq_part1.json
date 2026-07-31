@@ -24,22 +24,20 @@
     ],
     "transcription_convention": {
       "strikethrough": "Text struck through in source is wrapped in ~~double tildes~~. Replacement value (if any) follows immediately after.",
-      "verbatim_policy": "Spelling errors / OCR artefacts in source are preserved as-is where legible (e.g., 'Lakh'/'Lac' variants, 'Crare' for 'Crore', 'Confidential', 'SARES' for 'SPARES' on a later page). Illegible glyphs are marked 'illegible' rather than guessed.",
-      "stamp_numbers": "Numeric stamp codes are ink/rubber stamps embedded as images and are frequently not captured cleanly by the text layer; where a digit sequence could not be reliably read it is marked 'illegible' or given as best-effort partial reading with a note.",
+      "verbatim_policy": "Spelling errors / OCR artefacts in source are preserved as-is where legible (e.g., 'Lakh'/'Lac' variants, 'Crare' for 'Crore'). Illegible glyphs are marked 'illegible'.",
+      "stamp_numbers": "Numeric stamp codes are ink/rubber stamps embedded as images; where a digit sequence could not be reliably read it is marked 'illegible'.",
       "currency_note": "INR figures given in Indian numbering (lakh/crore grouping) as printed in source. USD figures given as printed."
     }
   },
   "pages": [
     {
-      "page_label": "Revised Tender Total (unnumbered page)",
-      "source_file": "page_001.png",
-      "stamp_number": "illegible",
+      "page_label": "Revised Tender Total",
+      "pdf_page": 1,
+      "source_file": "page_001.jpg",
+      "stamp_number": "illegible (partial)",
       "stamps_seals": [
-        "Delhi Metro Rail Corporation seal (partial, red ink)",
-        "ISOLUX INGENIERIA seal (partial)",
-        "STERLING AND WILSON seal (partial)",
-        "handwritten signatures/initials",
-        "margin annotation 'A' appears twice at right edge of the totals table (rows: PART-K revised figure, and TOTAL SUM row)"
+        "Delhi Metro Rail Corporation seal",
+        "ISOLUX INGENIERIA SOCIEDAD ANONIMA seal (partial)"
       ],
       "items": [
         {
@@ -55,11 +53,167 @@
           "text": "Lot 4: SCHEDULE S4-1: PRICES FOR WORKS ON LINE-8 ON UNDERGROUND SECTION FROM IGD TO JANAKPURI WEST."
         },
         {
+          "item_type": "general_note",
+          "s_no": "PART-A",
+          "description": "BOQ for Associated Electrical Works — Total Amount: Rs. 66,82,54,465 (INR). Foreign Currency: Nil.",
+          "section_no": "PART-A",
+          "section_description": "Financial Summary — BOQ Part Totals, Schedule S4-1, CE-10 & 11 Lot 4",
+          "inr_amount": "66,82,54,465",
+          "foreign_currency_usd": "",
+          "page_label": "Revised Tender Total",
+          "schedule": "Schedule S4-1",
+          "contract": "CE-10 and 11 Lot 4"
+        },
+        {
+          "item_type": "general_note",
+          "s_no": "PART-B",
+          "description": "BOQ for ECS Works (Environment Control System) — Total Amount: Rs. 39,93,99,394 (INR), USD 36,51,757. ECS Works include design, supply, installation, testing and commissioning of environment control system equipment for 7 underground stations and tunnel sections.",
+          "section_no": "PART-B",
+          "section_description": "Financial Summary — BOQ Part Totals, Schedule S4-1, CE-10 & 11 Lot 4",
+          "inr_amount": "39,93,99,394",
+          "foreign_currency_usd": "36,51,757",
+          "page_label": "Revised Tender Total",
+          "schedule": "Schedule S4-1",
+          "contract": "CE-10 and 11 Lot 4"
+        },
+        {
+          "item_type": "general_note",
+          "s_no": "PART-C",
+          "description": "BOQ for TVS Works (Tunnel Ventilation System) — Total Amount: Rs. 20,01,44,000 (INR), USD 50,67,080. TVS Works include trackway exhaust fans, jet fans, dampers, and associated ventilation equipment for tunnel sections.",
+          "section_no": "PART-C",
+          "section_description": "Financial Summary — BOQ Part Totals, Schedule S4-1, CE-10 & 11 Lot 4",
+          "inr_amount": "20,01,44,000",
+          "foreign_currency_usd": "50,67,080",
+          "page_label": "Revised Tender Total",
+          "schedule": "Schedule S4-1",
+          "contract": "CE-10 and 11 Lot 4"
+        },
+        {
+          "item_type": "general_note",
+          "s_no": "PART-D",
+          "description": "BOQ for BMS Works ECS and E&M (Building Management System) — Total Amount: Rs. 9,54,09,900 (INR). No foreign currency component.",
+          "section_no": "PART-D",
+          "section_description": "Financial Summary — BOQ Part Totals, Schedule S4-1, CE-10 & 11 Lot 4",
+          "inr_amount": "9,54,09,900",
+          "foreign_currency_usd": "",
+          "page_label": "Revised Tender Total",
+          "schedule": "Schedule S4-1",
+          "contract": "CE-10 and 11 Lot 4"
+        },
+        {
+          "item_type": "general_note",
+          "s_no": "PART-E",
+          "description": "BOQ for TVS BMS Works (Tunnel Ventilation System Building Management System) — Total Amount: Rs. 6,36,32,650 (INR), USD 4,29,110.",
+          "section_no": "PART-E",
+          "section_description": "Financial Summary — BOQ Part Totals, Schedule S4-1, CE-10 & 11 Lot 4",
+          "inr_amount": "6,36,32,650",
+          "foreign_currency_usd": "4,29,110",
+          "page_label": "Revised Tender Total",
+          "schedule": "Schedule S4-1",
+          "contract": "CE-10 and 11 Lot 4"
+        },
+        {
+          "item_type": "general_note",
+          "s_no": "PART-F",
+          "description": "BOQ for TVS-SCADA Works (Supervisory Control and Data Acquisition for Tunnel Ventilation) — Total Amount: Rs. 17,66,900 (INR). No foreign currency component.",
+          "section_no": "PART-F",
+          "section_description": "Financial Summary — BOQ Part Totals, Schedule S4-1, CE-10 & 11 Lot 4",
+          "inr_amount": "17,66,900",
+          "foreign_currency_usd": "",
+          "page_label": "Revised Tender Total",
+          "schedule": "Schedule S4-1",
+          "contract": "CE-10 and 11 Lot 4"
+        },
+        {
+          "item_type": "general_note",
+          "s_no": "PART-G",
+          "description": "BOQ for Civil Works as per DSR (Delhi Schedule of Rates) — Total Amount: Rs. 1,26,16,250 (INR). No foreign currency component.",
+          "section_no": "PART-G",
+          "section_description": "Financial Summary — BOQ Part Totals, Schedule S4-1, CE-10 & 11 Lot 4",
+          "inr_amount": "1,26,16,250",
+          "foreign_currency_usd": "",
+          "page_label": "Revised Tender Total",
+          "schedule": "Schedule S4-1",
+          "contract": "CE-10 and 11 Lot 4"
+        },
+        {
+          "item_type": "general_note",
+          "s_no": "PART-H",
+          "description": "BOQ for Additional Miscellaneous Items — Total Amount: Rs. 3,65,63,350 (INR), USD 86,927.",
+          "section_no": "PART-H",
+          "section_description": "Financial Summary — BOQ Part Totals, Schedule S4-1, CE-10 & 11 Lot 4",
+          "inr_amount": "3,65,63,350",
+          "foreign_currency_usd": "86,927",
+          "page_label": "Revised Tender Total",
+          "schedule": "Schedule S4-1",
+          "contract": "CE-10 and 11 Lot 4"
+        },
+        {
+          "item_type": "general_note",
+          "s_no": "PART-I",
+          "description": "BOQ for AMC beyond DLP (Annual Maintenance Contract beyond Defects Liability Period) — Total Amount: Rs. 6,00,43,530 (INR). No foreign currency component.",
+          "section_no": "PART-I",
+          "section_description": "Financial Summary — BOQ Part Totals, Schedule S4-1, CE-10 & 11 Lot 4",
+          "inr_amount": "6,00,43,530",
+          "foreign_currency_usd": "",
+          "page_label": "Revised Tender Total",
+          "schedule": "Schedule S4-1",
+          "contract": "CE-10 and 11 Lot 4"
+        },
+        {
+          "item_type": "general_note",
+          "s_no": "PART-J",
+          "description": "BOQ for Spares — Total Amount: Rs. 2,38,03,130 (INR), USD 3,22,657. Spare parts for ECS, TVS, BMS equipment for the duration of the Defects Liability Period.",
+          "section_no": "PART-J",
+          "section_description": "Financial Summary — BOQ Part Totals, Schedule S4-1, CE-10 & 11 Lot 4",
+          "inr_amount": "2,38,03,130",
+          "foreign_currency_usd": "3,22,657",
+          "page_label": "Revised Tender Total",
+          "schedule": "Schedule S4-1",
+          "contract": "CE-10 and 11 Lot 4"
+        },
+        {
+          "item_type": "general_note",
+          "s_no": "PART-K",
+          "description": "BOQ for Training and Training Manuals — Total Amount: Rs. 6,31,070 (INR). Training for employer staff on operation and maintenance of ECS, TVS and BMS systems. No foreign currency component.",
+          "section_no": "PART-K",
+          "section_description": "Financial Summary — BOQ Part Totals, Schedule S4-1, CE-10 & 11 Lot 4",
+          "inr_amount": "6,31,070",
+          "foreign_currency_usd": "",
+          "page_label": "Revised Tender Total",
+          "schedule": "Schedule S4-1",
+          "contract": "CE-10 and 11 Lot 4"
+        },
+        {
+          "item_type": "general_note",
+          "s_no": "PART-L",
+          "description": "BOQ for Operation and Maintenance Manuals — Total Amount: Rs. 5,04,390 (INR). Operation and maintenance documentation for all ECS, TVS and BMS equipment. No foreign currency component.",
+          "section_no": "PART-L",
+          "section_description": "Financial Summary — BOQ Part Totals, Schedule S4-1, CE-10 & 11 Lot 4",
+          "inr_amount": "5,04,390",
+          "foreign_currency_usd": "",
+          "page_label": "Revised Tender Total",
+          "schedule": "Schedule S4-1",
+          "contract": "CE-10 and 11 Lot 4"
+        },
+        {
+          "item_type": "general_note",
+          "s_no": "TOTAL",
+          "description": "Total Contract Value — SCHEDULE S4-1 TOTAL SUM: Rs. 1,56,27,69,029 (One Hundred Fifty Six Crore Twenty Seven Lakh Sixty Nine Thousand Twenty Nine Rupees only), USD 9,557,531 (Nine Million Five Hundred Fifty Seven Thousand Five Hundred and Thirty One Only). Contract CE-10 & 11 Lot 4 for ECS and TVS works on LINE-8 underground section from IGD to Janakpuri West.",
+          "section_no": "TOTAL",
+          "section_description": "Financial Summary — BOQ Part Totals, Schedule S4-1, CE-10 & 11 Lot 4",
+          "inr_amount": "1,56,27,69,029",
+          "foreign_currency_usd": "9,557,531",
+          "page_label": "Revised Tender Total",
+          "schedule": "Schedule S4-1",
+          "contract": "CE-10 and 11 Lot 4"
+        },
+        {
           "item_type": "table",
-          "table_title": "Total Brought From above Bills",
+          "table_title": "Schedule S4-1 Revised Tender Total — Lot 4 prices for works on Line-8 underground section IGD to Janakpuri West",
           "columns": [
             "Section No.",
-            "DESCRIPTION",
+            "Description",
             "INR",
             "Foreign Currency (USD)"
           ],
@@ -128,9 +282,7 @@
               "section_no": "PART-K",
               "description": "BOQ for Training & Training Manuals",
               "inr": "6,31,070",
-              "foreign_currency_usd": "",
-              "has_annotation": true,
-              "annotation_note": "row marked italic/underlined in source and flagged with margin annotation 'A', indicating this is the revised figure (compare 6,30,490 in the non-revised Tender Total)"
+              "foreign_currency_usd": ""
             },
             {
               "section_no": "PART-L",
@@ -139,32 +291,30 @@
               "foreign_currency_usd": ""
             },
             {
-              "section_no": "",
+              "section_no": "TOTAL SUM",
               "description": "TOTAL SUM",
-              "inr": "156,27,69,029",
+              "inr": "1,56,27,69,029",
               "foreign_currency_usd": "9,557,531",
-              "item_type": "total_row",
-              "has_annotation": true,
-              "annotation_note": "margin annotation 'A' present"
+              "item_type": "total_row"
             }
           ]
         },
         {
           "item_type": "words_total",
-          "total_sum_words_inr": "One Hundred Fifty Six Crore Twenty Seven Lakh Sixty Nine Thousand Twenty Nine rupees only",
+          "total_sum_words_inr": "One Hundred Fifty Six Crore Twenty Seven Lakh Sixty Nine Thousand Twenty Nine Rupees only",
           "total_sum_words_foreign_currency": "USD Nine Million Five Hundred Fifty Seven Thousand Five Hundred and Thirty One Only"
         }
       ]
     },
     {
-      "page_label": "Tender Total (unnumbered page)",
-      "source_file": "page_002.png",
-      "stamp_number": "000012 (top, partially legible); 000017 (bottom, partially legible)",
+      "page_label": "Tender Total",
+      "pdf_page": 2,
+      "source_file": "page_002.jpg",
+      "stamp_number": "000012 / 000017",
       "stamps_seals": [
+        "ISOLUX CORSÁN / ISOLUX INGENIERIA, S.A. letterhead",
         "Delhi Metro Rail Corporation seal",
-        "ISOLUX INGENIERIA SOCIEDAD ANONIMA MADRID seal",
-        "STERLING AND WILSON LIMITED seal (partial)",
-        "handwritten signatures/initials"
+        "STERLING AND WILSON LIMITED seal"
       ],
       "items": [
         {
@@ -180,15 +330,23 @@
           "text": "In accordance with the accompanying and signed form of tender, we ISOLUX INGENIERIA SA AND STERLING & WILSON LTD offer to supply, install, test, commission, and remedy at any defects of the whole said works, in conformity with the said drawings, particular specifications, conditions of contracts and other contract documents of tender CE-10 & 11 Lot 4 for the following sums:"
         },
         {
-          "item_type": "section_title",
-          "text": "Lot 4 : SCHEDULE S4-1 : PRICES FOR WORKS ON LINE-8 ON UNDERGROUND SECTION FROM IGD TO JANAKPURI WEST."
+          "item_type": "general_note",
+          "s_no": "TOTAL-CONTRACTOR",
+          "description": "Contractor Tender Total (Isolux Ingenieria SA and Sterling & Wilson Ltd) — Schedule S4-1 Total Sum: Rs. 1,56,27,68,449 (One Hundred Fifty Six Crore Twenty Seven Lac Sixty Eight Thousand Four Hundred Forty Nine Rupees and No Paise), USD 95,57,531 (Nine Million Five Hundred Fifty Seven Thousand Five Hundred Thirty One Dollars and No Cents). Contract CE-10 & 11 Lot 4, Line-8 underground section IGD to Janakpuri West. Note: slight variation from revised tender total reflects pre-discount/pre-revision figure.",
+          "section_no": "TOTAL",
+          "section_description": "Contractor Tender Total — Schedule S4-1, CE-10 & 11 Lot 4",
+          "inr_amount": "1,56,27,68,449",
+          "foreign_currency_usd": "95,57,531",
+          "page_label": "Tender Total",
+          "schedule": "Schedule S4-1",
+          "contract": "CE-10 and 11 Lot 4"
         },
         {
           "item_type": "table",
-          "table_title": "Total Brought From above Bills",
+          "table_title": "Schedule S4-1 Tender Total — Lot 4 (Isolux Ingenieria SA and Sterling & Wilson Ltd)",
           "columns": [
             "Section No.",
-            "DESCRIPTION",
+            "Description",
             "INR",
             "Foreign Currency USD"
           ],
@@ -266,34 +424,31 @@
               "foreign_currency_usd": ""
             },
             {
-              "section_no": "",
+              "section_no": "TOTAL SUM",
               "description": "TOTAL SUM",
-              "inr": "Rs. 1 56 27 68 449.00",
-              "foreign_currency_usd": "$95 57 531.00",
+              "inr": "Rs. 1,56,27,68,449.00",
+              "foreign_currency_usd": "$95,57,531.00",
               "item_type": "total_row"
             }
           ]
         },
         {
           "item_type": "words_total",
-          "total_sum_words_inr": "One Hundred Fifty Six Crare Twenty Seven Lac Sixty Eight Thousand Four Hundred Forty Nine Rupees and No Paise",
+          "total_sum_words_inr": "One Hundred Fifty Six Crore Twenty Seven Lac Sixty Eight Thousand Four Hundred Forty Nine Rupees and No Paise",
           "total_sum_words_foreign_currency": "Nine Million Five Hundred Fifty Seven Thousand Five Hundred Thirty One Dollars and No Cents"
         }
       ]
     },
     {
-      "page_label": "Discount Letter (unnumbered page)",
-      "source_file": "page_003.png",
-      "stamp_number": "0000 1 (partial, illegible remainder)",
+      "page_label": "Discount Letter",
+      "pdf_page": 3,
+      "source_file": "page_003.jpg",
+      "stamp_number": "000018 (partial)",
       "stamps_seals": [
+        "ISOLUX CORSÁN / ISOLUX INGENIERIA, S.A. letterhead",
         "Delhi Metro Rail Corporation seal",
-        "ISOLUX INGENIERIA SOCIEDAD ANONIMA MADRID seal",
-        "STERLING AND WILSON LIMITED seal (partial)",
-        "handwritten signature of Jose Garrido de las Heras"
-      ],
-      "handwritten_annotations": [
-        "'6/7' circled at top right",
-        "'20/5/13' handwritten below the circled '6/7'"
+        "STERLING AND WILSON LIMITED seal",
+        "Signature of Jose Garrido de las Heras (Legal Representative)"
       ],
       "items": [
         {
@@ -301,12 +456,8 @@
           "text": "ISOLUX CORSÁN / ISOLUX INGENIERIA, S.A."
         },
         {
-          "item_type": "date",
-          "text": "Date: 17/12/2012"
-        },
-        {
           "item_type": "letter_address",
-          "text": "To\nThe Managing Director\nDelhi Metro Rail Corporation\nMetro Bhawan,\nFire Brigade Lane, Barakhamba Road,\nNew Delhi – 110 001"
+          "text": "To The Managing Director, Delhi Metro Rail Corporation, Metro Bhawan, Fire Brigade Lane, Barakhamba Road, New Delhi - 110001"
         },
         {
           "item_type": "letter_subject",
@@ -318,39 +469,44 @@
         },
         {
           "item_type": "letter_title",
-          "text": "--------------DISCOUNT LETTER-----------"
+          "text": "DISCOUNT LETTER"
         },
         {
-          "item_type": "letter_salutation",
-          "text": "Dear Sir,"
+          "item_type": "general_note",
+          "s_no": "DISCOUNT",
+          "description": "Discount Letter dated 17/12/2012 — Isolux Ingenieria SA and Sterling & Wilson Ltd offer an overall discount of 6% (six per cent) on their quoted price for Contract Package CE-10 & CE-11 Lot 4 (ECS and TVS works for Line-6 and Line-7 underground stations, Delhi MRTS Phase-3). Signed by Jose Garrido de las Heras, Legal Representative.",
+          "section_no": "DISCOUNT",
+          "section_description": "Discount Letter — CE-10 & CE-11 Lot 4",
+          "discount_percentage": "6%",
+          "discount_date": "17/12/2012",
+          "signed_by": "Jose Garrido de las Heras (Legal Representative, Isolux Ingenieria SA and Sterling & Wilson Ltd)",
+          "page_label": "Discount Letter",
+          "schedule": "Schedule S4-1",
+          "contract": "CE-10 and 11 Lot 4"
         },
         {
           "item_type": "letter_body",
-          "text": "Subsequent to our price submitted in our financial Package , We hereby offer a Overall Discount of 6 % (six per cent) on our Quoted Price ."
+          "text": "Subsequent to our price submitted in our financial Package, We hereby offer a Overall Discount of 6% (six per cent) on our Quoted Price."
         },
         {
-          "item_type": "signature_block",
+          "item_type": "letter_salutation",
           "text": "For and on Behalf of Consortium of ISOLUX INGENIERIA SA AND STERLING & WILSON LTD."
         },
         {
           "item_type": "signature_block",
-          "text": "Jose Garrido de las Heras\n(Legal Representative)"
-        },
-        {
-          "item_type": "footer_stamp_text",
-          "text": "DELHI METRO RAIL CORPORATION LTD. / DESIGN VERIFICATION, DETAIL ENGINEERING, SUPPLY, INSTALLATION, TESTING AND COMMISSIONING OF ENVIRONMENT CONTROL SYSTEM (ECS) AND TUNNEL VENTILATION SYSTEM (TVS) OF UNDERGROUND STATIONS FOR DELHI MASS RAPID TRANSPORT SYSTEM PROJECT (partially cut off at page edge)"
+          "text": "Jose Garrido de las Heras (Legal Representative)"
         }
       ]
     },
     {
       "page_label": "PART-A Summary",
-      "source_file": "page_004.png",
-      "stamp_number": "top: 000013; bottom: 0019",
+      "pdf_page": 4,
+      "source_file": "page_004.jpg",
+      "stamp_number": "000019",
       "stamps_seals": [
+        "ISOLUX CORSÁN / ISOLUX INGENIERIA, S.A. letterhead",
         "Delhi Metro Rail Corporation seal",
-        "ISOLUX INGENIERIA SOCIEDAD ANONIMA seal (partial)",
-        "STERLING AND WILSON LIMITED seal (partial)",
-        "handwritten signatures/initials"
+        "STERLING AND WILSON LIMITED seal"
       ],
       "items": [
         {
@@ -363,20 +519,32 @@
         },
         {
           "item_type": "title",
-          "text": "PART - A BOQ for Associated Electrical Works"
+          "text": "PART-A BOQ for Associated Electrical Works"
+        },
+        {
+          "item_type": "general_note",
+          "s_no": "PART-A",
+          "description": "PART-A BOQ for Associated Electrical Works — Total Amount: Rs. 66,82,54,465 (Sixty Six Crore Eighty Two Lac Fifty Four Thousand Four Hundred Sixty Five Rupees). Foreign Currency: No Dollars and No Cents. This covers supply, installation, testing and commissioning of all electrical panels, switchboards, distribution boards, ACBs, MCCBs, MCBs, busbars and associated electrical works for ECS/TVS at all stations.",
+          "section_no": "PART-A",
+          "section_description": "BOQ Part Summary — Associated Electrical Works, Schedule S4-1",
+          "inr_amount": "66,82,54,465",
+          "foreign_currency_usd": "",
+          "page_label": "PART-A Summary",
+          "schedule": "Schedule S4-1",
+          "contract": "CE-10 and 11 Lot 4"
         },
         {
           "item_type": "table",
-          "table_title": "Total brought from above Bills",
+          "table_title": "PART-A BOQ for Associated Electrical Works",
           "columns": [
             "Section No.",
-            "DESCRIPTION",
+            "Description",
             "INR",
-            "FOREIGN CURRENCY USD"
+            "Foreign Currency USD"
           ],
           "rows": [
             {
-              "section_no": "PART - A",
+              "section_no": "PART-A",
               "description": "BOQ for Associated Electrical Works",
               "inr": "Rs. 66,82,54,465.00",
               "foreign_currency_usd": "$0.00"
@@ -399,13 +567,13 @@
     },
     {
       "page_label": "PART-B Summary",
-      "source_file": "page_005.png",
-      "stamp_number": "top: 000014; bottom: illegible (approx. 000020)",
+      "pdf_page": 5,
+      "source_file": "page_005.jpg",
+      "stamp_number": "000020",
       "stamps_seals": [
+        "ISOLUX CORSÁN letterhead",
         "Delhi Metro Rail Corporation seal",
-        "ISOLUX INGENIERIA SOCIEDAD ANONIMA seal (partial)",
-        "STERLING AND WILSON LIMITED seal (partial)",
-        "handwritten signatures/initials"
+        "STERLING AND WILSON LIMITED seal"
       ],
       "items": [
         {
@@ -418,20 +586,32 @@
         },
         {
           "item_type": "title",
-          "text": "PART - B BOQ FOR ECS Works"
+          "text": "PART-B BOQ FOR ECS Works"
+        },
+        {
+          "item_type": "general_note",
+          "s_no": "PART-B",
+          "description": "PART-B BOQ for ECS Works (Environment Control System) — Total Amount: Rs. 39,93,99,394 (Thirty Nine Crore Ninety Three Lac Ninety Nine Thousand Three Hundred Ninety Four Rupees), USD 36,51,757 (Three Million Six Hundred Fifty One Thousand Seven Hundred Fifty Seven Dollars). ECS Works cover chillers, cooling towers, AHUs, fans, pumps, dampers, ducts, cables, panels and all mechanical and electrical equipment for the Environment Control System.",
+          "section_no": "PART-B",
+          "section_description": "BOQ Part Summary — ECS Works, Schedule S4-1",
+          "inr_amount": "39,93,99,394",
+          "foreign_currency_usd": "36,51,757",
+          "page_label": "PART-B Summary",
+          "schedule": "Schedule S4-1",
+          "contract": "CE-10 and 11 Lot 4"
         },
         {
           "item_type": "table",
-          "table_title": "Total brought from above Bills",
+          "table_title": "PART-B BOQ FOR ECS Works",
           "columns": [
             "Section No.",
-            "DESCRIPTION",
+            "Description",
             "INR",
-            "FOREIGN CURRENCY USD"
+            "Foreign Currency USD"
           ],
           "rows": [
             {
-              "section_no": "PART - B",
+              "section_no": "PART-B",
               "description": "BOQ FOR ECS Works",
               "inr": "Rs. 39,93,99,394.00",
               "foreign_currency_usd": "$36,51,757.00"
@@ -454,13 +634,13 @@
     },
     {
       "page_label": "PART-C Summary",
-      "source_file": "page_006.png",
-      "stamp_number": "top: 000015; bottom: illegible (partial digits visible near seal)",
+      "pdf_page": 6,
+      "source_file": "page_006.jpg",
+      "stamp_number": "000021",
       "stamps_seals": [
+        "ISOLUX CORSÁN letterhead",
         "Delhi Metro Rail Corporation seal",
-        "ISOLUX INGENIERIA SOCIEDAD ANONIMA seal (partial)",
-        "STERLING AND WILSON LIMITED seal (partial)",
-        "handwritten signatures/initials"
+        "STERLING AND WILSON LIMITED seal"
       ],
       "items": [
         {
@@ -473,20 +653,32 @@
         },
         {
           "item_type": "title",
-          "text": "PART - C BOQ FOR TVS Works"
+          "text": "PART-C BOQ FOR TVS Works"
+        },
+        {
+          "item_type": "general_note",
+          "s_no": "PART-C",
+          "description": "PART-C BOQ for TVS Works (Tunnel Ventilation System) — Total Amount: Rs. 20,01,44,000 (Twenty Crore One Lac Forty Four Thousand Rupees), USD 50,67,080 (Five Million Sixty Seven Thousand Eighty Dollars). TVS Works cover trackway exhaust fans, jet fans, over-track exhaust systems, supply air fans, dampers, acoustic panels, and all mechanical equipment for tunnel ventilation.",
+          "section_no": "PART-C",
+          "section_description": "BOQ Part Summary — TVS Works, Schedule S4-1",
+          "inr_amount": "20,01,44,000",
+          "foreign_currency_usd": "50,67,080",
+          "page_label": "PART-C Summary",
+          "schedule": "Schedule S4-1",
+          "contract": "CE-10 and 11 Lot 4"
         },
         {
           "item_type": "table",
-          "table_title": "Total brought from above Bills",
+          "table_title": "PART-C BOQ FOR TVS Works",
           "columns": [
             "Section No.",
-            "DESCRIPTION",
+            "Description",
             "INR",
-            "FOREIGN CURRENCY USD"
+            "Foreign Currency USD"
           ],
           "rows": [
             {
-              "section_no": "PART - C",
+              "section_no": "PART-C",
               "description": "BOQ FOR TVS Works",
               "inr": "Rs. 20,01,44,000.00",
               "foreign_currency_usd": "$50,67,080.00"
@@ -509,13 +701,13 @@
     },
     {
       "page_label": "PART-D Summary",
-      "source_file": "page_007.png",
-      "stamp_number": "top: illegible (approx. 000016); bottom: illegible (approx. 000022)",
+      "pdf_page": 7,
+      "source_file": "page_007.jpg",
+      "stamp_number": "000022",
       "stamps_seals": [
+        "ISOLUX CORSÁN letterhead",
         "Delhi Metro Rail Corporation seal",
-        "ISOLUX INGENIERIA SOCIEDAD ANONIMA seal (partial)",
-        "STERLING AND WILSON LIMITED seal (partial)",
-        "handwritten signatures/initials"
+        "STERLING AND WILSON LIMITED seal"
       ],
       "items": [
         {
@@ -528,21 +720,33 @@
         },
         {
           "item_type": "title",
-          "text": "PART - D BOQ FOR BMS Works- ECS &E&M"
+          "text": "PART-D BOQ FOR BMS Works — ECS & E&M"
+        },
+        {
+          "item_type": "general_note",
+          "s_no": "PART-D",
+          "description": "PART-D BOQ for BMS Works — ECS and E&M (Building Management System for Environment Control System and Electrical & Mechanical works) — Total Amount: Rs. 9,54,09,900 (Nine Crore Fifty Four Lac Nine Thousand Nine Hundred Rupees). No foreign currency component.",
+          "section_no": "PART-D",
+          "section_description": "BOQ Part Summary — BMS Works ECS and E&M, Schedule S4-1",
+          "inr_amount": "9,54,09,900",
+          "foreign_currency_usd": "",
+          "page_label": "PART-D Summary",
+          "schedule": "Schedule S4-1",
+          "contract": "CE-10 and 11 Lot 4"
         },
         {
           "item_type": "table",
-          "table_title": "Total brought from above Bills",
+          "table_title": "PART-D BOQ FOR BMS Works — ECS & E&M",
           "columns": [
             "Section No.",
-            "DESCRIPTION",
+            "Description",
             "INR",
-            "FOREIGN CURRENCY USD"
+            "Foreign Currency USD"
           ],
           "rows": [
             {
-              "section_no": "PART - D",
-              "description": "BOQ FOR BMS Works -ECS &E&M",
+              "section_no": "PART-D",
+              "description": "BOQ FOR BMS Works — ECS & E&M",
               "inr": "Rs. 9,54,09,900.00",
               "foreign_currency_usd": "$0.00"
             },
@@ -564,13 +768,13 @@
     },
     {
       "page_label": "PART-E Summary",
-      "source_file": "page_008.png",
-      "stamp_number": "top: illegible (approx. 000017); bottom: 000023",
+      "pdf_page": 8,
+      "source_file": "page_008.jpg",
+      "stamp_number": "000023",
       "stamps_seals": [
+        "ISOLUX CORSÁN letterhead",
         "Delhi Metro Rail Corporation seal",
-        "ISOLUX INGENIERIA SOCIEDAD ANONIMA seal (partial)",
-        "STERLING AND WILSON LIMITED seal (partial)",
-        "handwritten signatures/initials"
+        "STERLING AND WILSON LIMITED seal"
       ],
       "items": [
         {
@@ -583,20 +787,32 @@
         },
         {
           "item_type": "title",
-          "text": "PART - E BOQ FOR TVS BMS Works"
+          "text": "PART-E BOQ FOR TVS BMS Works"
+        },
+        {
+          "item_type": "general_note",
+          "s_no": "PART-E",
+          "description": "PART-E BOQ for TVS BMS Works (Building Management System for Tunnel Ventilation System) — Total Amount: Rs. 6,36,32,650 (Six Crore Thirty Six Lac Thirty Two Thousand Six Hundred Fifty Rupees), USD 4,29,110 (Four Hundred Twenty Nine Thousand One Hundred Ten Dollars).",
+          "section_no": "PART-E",
+          "section_description": "BOQ Part Summary — TVS BMS Works, Schedule S4-1",
+          "inr_amount": "6,36,32,650",
+          "foreign_currency_usd": "4,29,110",
+          "page_label": "PART-E Summary",
+          "schedule": "Schedule S4-1",
+          "contract": "CE-10 and 11 Lot 4"
         },
         {
           "item_type": "table",
-          "table_title": "Total brought from above Bills",
+          "table_title": "PART-E BOQ FOR TVS BMS Works",
           "columns": [
             "Section No.",
-            "DESCRIPTION",
+            "Description",
             "INR",
-            "FOREIGN CURRENCY USD"
+            "Foreign Currency USD"
           ],
           "rows": [
             {
-              "section_no": "PART - E",
+              "section_no": "PART-E",
               "description": "BOQ FOR TVS BMS Works",
               "inr": "Rs. 6,36,32,650.00",
               "foreign_currency_usd": "$4,29,110.00"
@@ -619,13 +835,13 @@
     },
     {
       "page_label": "PART-F Summary",
-      "source_file": "page_009.png",
-      "stamp_number": "top: illegible (approx. 000018); bottom: 000024",
+      "pdf_page": 9,
+      "source_file": "page_009.jpg",
+      "stamp_number": "000024",
       "stamps_seals": [
+        "ISOLUX CORSÁN letterhead",
         "Delhi Metro Rail Corporation seal",
-        "ISOLUX INGENIERIA SOCIEDAD ANONIMA seal (partial)",
-        "STERLING AND WILSON LIMITED seal (partial)",
-        "handwritten signatures/initials"
+        "STERLING AND WILSON LIMITED seal"
       ],
       "items": [
         {
@@ -638,28 +854,40 @@
         },
         {
           "item_type": "title",
-          "text": "PART - F BOQ FOR TVS-SCADA Works"
+          "text": "PART-F BOQ FOR TVS-SCADA Works"
+        },
+        {
+          "item_type": "general_note",
+          "s_no": "PART-F",
+          "description": "PART-F BOQ for TVS-SCADA Works (Supervisory Control and Data Acquisition system for Tunnel Ventilation System) — Total Amount: Rs. 17,66,900 (Seventeen Lac Sixty Six Thousand Nine Hundred Rupees). No foreign currency component.",
+          "section_no": "PART-F",
+          "section_description": "BOQ Part Summary — TVS-SCADA Works, Schedule S4-1",
+          "inr_amount": "17,66,900",
+          "foreign_currency_usd": "",
+          "page_label": "PART-F Summary",
+          "schedule": "Schedule S4-1",
+          "contract": "CE-10 and 11 Lot 4"
         },
         {
           "item_type": "table",
-          "table_title": "Total brought from above Bills",
+          "table_title": "PART-F BOQ FOR TVS-SCADA Works",
           "columns": [
             "Section No.",
-            "DESCRIPTION",
+            "Description",
             "INR",
-            "FOREIGN CURRENCY USD"
+            "Foreign Currency USD"
           ],
           "rows": [
             {
-              "section_no": "PART - F",
+              "section_no": "PART-F",
               "description": "BOQ FOR TVS-SCADA Works",
-              "inr": "Rs.17,66,900.00",
+              "inr": "Rs. 17,66,900.00",
               "foreign_currency_usd": "$0.00"
             },
             {
               "section_no": "",
               "description": "TOTAL SUM",
-              "inr": "Rs.17,66,900.00",
+              "inr": "Rs. 17,66,900.00",
               "foreign_currency_usd": "$0.00",
               "item_type": "total_row"
             }
@@ -674,13 +902,13 @@
     },
     {
       "page_label": "PART-G Summary",
-      "source_file": "page_010.png",
-      "stamp_number": "top: illegible (approx. 000019); bottom: 000025",
+      "pdf_page": 10,
+      "source_file": "page_010.jpg",
+      "stamp_number": "000025",
       "stamps_seals": [
+        "ISOLUX CORSÁN letterhead",
         "Delhi Metro Rail Corporation seal",
-        "ISOLUX INGENIERIA SOCIEDAD ANONIMA seal (partial)",
-        "STERLING AND WILSON LIMITED seal (partial)",
-        "handwritten signatures/initials"
+        "STERLING AND WILSON LIMITED seal"
       ],
       "items": [
         {
@@ -693,28 +921,40 @@
         },
         {
           "item_type": "title",
-          "text": "PART - G BOQ FOR CIVIL Works as per DSR"
+          "text": "PART-G BOQ FOR CIVIL Works as per DSR"
+        },
+        {
+          "item_type": "general_note",
+          "s_no": "PART-G",
+          "description": "PART-G BOQ for Civil Works as per DSR (Delhi Schedule of Rates) — Total Amount: Rs. 1,26,16,250 (One Crore Twenty Six Lac Sixteen Thousand Two Hundred Fifty Rupees). No foreign currency component. Civil works include structural, architectural and civil construction as required per Delhi Schedule of Rates.",
+          "section_no": "PART-G",
+          "section_description": "BOQ Part Summary — Civil Works as per DSR, Schedule S4-1",
+          "inr_amount": "1,26,16,250",
+          "foreign_currency_usd": "",
+          "page_label": "PART-G Summary",
+          "schedule": "Schedule S4-1",
+          "contract": "CE-10 and 11 Lot 4"
         },
         {
           "item_type": "table",
-          "table_title": "Total brought from above Bills",
+          "table_title": "PART-G BOQ FOR CIVIL Works as per DSR",
           "columns": [
             "Section No.",
-            "DESCRIPTION",
+            "Description",
             "INR",
-            "FOREIGN CURRENCY USD"
+            "Foreign Currency USD"
           ],
           "rows": [
             {
-              "section_no": "PART - G",
+              "section_no": "PART-G",
               "description": "BOQ FOR CIVIL Works as per DSR",
-              "inr": "RS. 1,26,16,250.00",
+              "inr": "Rs. 1,26,16,250.00",
               "foreign_currency_usd": "$0.00"
             },
             {
               "section_no": "",
               "description": "TOTAL SUM",
-              "inr": "Rs.1,26,16,250.00",
+              "inr": "Rs. 1,26,16,250.00",
               "foreign_currency_usd": "$0.00",
               "item_type": "total_row"
             }
@@ -722,7 +962,7 @@
         },
         {
           "item_type": "words_total",
-          "total_sum_words_inr": "One Crare Twenty Six Lac Sixteen Thousand Two Hundred Fifty Rupees and No Paise",
+          "total_sum_words_inr": "One Crore Twenty Six Lac Sixteen Thousand Two Hundred Fifty Rupees and No Paise",
           "total_sum_words_foreign_currency": "No Dollars and No Cents"
         }
       ]
