@@ -105,6 +105,11 @@ _CLAUSE_KEYWORDS: frozenset = frozenset({
     "spare parts", "tools and test equipment",
     # clause reference words (without an actual clause number)
     "clause", "sub-clause", "article", "section",
+    # ISSUE 4 FIX: "contractor obligation" (singular) was already present but,
+    # per the word-boundary matcher, did not match "contractor obligations"
+    # (plural) as used in real queries ("s" immediately follows "obligation",
+    # so \b fails there). Adding the plural form covers both phrasings.
+    "contractor obligations",
 })
 
 # BOQ-domain keywords (bill of quantities / materials / civil works).
@@ -135,6 +140,20 @@ _BOQ_KEYWORDS: frozenset = frozenset({
     "supply and install", "supply and erect", "furnish",
     "cable", "conduit", "duct", "tray",
     "earthing", "lightning protection",
+    # ISSUE 5 FIX: financial BOQ / tender-summary keywords were missing
+    # entirely. Terms verified against the actual corpus (data/boq_part1.json:
+    # "Tender Total", "Revised Tender Total", "Discount Letter", "ECS Works",
+    # "TVS Works", "PART-A".."PART-L" section headers, "Contract Value" /
+    # "Total Sum" schedule totals). These are financial/BOQ-summary terms
+    # that do not appear in clause bodies, so they are unambiguously
+    # BOQ-domain like the rest of this set.
+    "tender total", "revised tender total",
+    "contract value", "total contract value",
+    "tender sum", "total sum",
+    "discount", "discount letter",
+    "ecs works", "tvs works",
+    "part-a", "part-b", "part-c", "part-d", "part-e", "part-f",
+    "part-g", "part-h", "part-i", "part-j", "part-k", "part-l",
 })
 
 
