@@ -213,6 +213,7 @@ class SourceItem(BaseModel):
     retrieval_source: Optional[str] = None
     reranker_score: Optional[float] = None
     chunk_id: Optional[str] = None
+    max_pdf_page: Optional[int] = None  # total pages available for this doc_id
     # TASK 3 -- UI retrieval label fix. Exposes the existing
     # metadata["chunk_type"] ("clause" or "boq", set unconditionally by
     # metadata_loader.py for every chunk) so the frontend can render
@@ -375,12 +376,14 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 
 PAGE_IMAGES_DIR = os.environ.get("PAGE_IMAGES_DIR", "page_images")
-AVAILABLE_PAGES: set = set()  # set[tuple[str, int]]
+AVAILABLE_PAGES: set = set()    # set[tuple[str, int]]
+_MAX_PDF_PAGE: dict = {}        # doc_id -> highest page number with a rendered image
 
 
 def _scan_page_images() -> None:
-    """Populate AVAILABLE_PAGES from PAGE_IMAGES_DIR at startup."""
+    """Populate AVAILABLE_PAGES and _MAX_PDF_PAGE from PAGE_IMAGES_DIR at startup."""
     AVAILABLE_PAGES.clear()
+    _MAX_PDF_PAGE.clear()
     if not os.path.isdir(PAGE_IMAGES_DIR):
         logger.warning("page images dir %s not found - viewer disabled", PAGE_IMAGES_DIR)
         return
@@ -391,10 +394,14 @@ def _scan_page_images() -> None:
         for fname in os.listdir(doc_dir):
             if fname.startswith("p") and fname.endswith(".jpg"):
                 try:
-                    AVAILABLE_PAGES.add((doc_id, int(fname[1:5])))
+                    page_num = int(fname[1:5])
+                    AVAILABLE_PAGES.add((doc_id, page_num))
+                    if page_num > _MAX_PDF_PAGE.get(doc_id, 0):
+                        _MAX_PDF_PAGE[doc_id] = page_num
                 except ValueError:
                     pass
-    logger.info("evidence viewer: %d page images available", len(AVAILABLE_PAGES))
+    logger.info("evidence viewer: %d page images available across %d documents",
+                len(AVAILABLE_PAGES), len(_MAX_PDF_PAGE))
 
 
 def _check_stamp_integrity() -> None:
@@ -669,6 +676,10 @@ def _build_sources(
             for fname in FIGURE_MANIFEST.get((doc_id, pdf_page), [])
         ] if doc_id and pdf_page not in (None, "") else []
 
+        # Compute max available page for this document so the frontend
+        # can disable the next-page button when the user reaches the end.
+        max_pdf_page = _MAX_PDF_PAGE.get(doc_id) if doc_id else None
+
         sources.append(
             SourceItem(
                 clause=metadata.get("clause_no"),
@@ -686,6 +697,7 @@ def _build_sources(
                 chunk_id=candidate.get("chunk_id") or metadata.get("chunk_id"),
                 chunk_type=metadata.get("chunk_type"),
                 query_intent=query_intent,       # TASK 4
+                max_pdf_page=max_pdf_page,       # navigation bound for PageViewer
             )
         )
     return sources

@@ -60,7 +60,14 @@ export default function PageViewer({ source, onClose }) {
         <div className="page-viewer__nav">
           <button onClick={() => setPdfPage((p) => Math.max(1, p - 1))}
             aria-label="Previous page">‹</button>
-          <button onClick={() => setPdfPage((p) => p + 1)}
+          <button
+            onClick={() => setPdfPage((p) => {
+              const maxPage = source.max_pdf_page;
+              return maxPage ? Math.min(maxPage, p + 1) : p + 1;
+            })}
+            disabled={!!(source.max_pdf_page && pdfPage >= source.max_pdf_page)}
+            style={source.max_pdf_page && pdfPage >= source.max_pdf_page
+              ? {opacity: 0.3, cursor: 'not-allowed'} : {}}
             aria-label="Next page">›</button>
           <button onClick={onClose} aria-label="Close viewer">×</button>
         </div>
