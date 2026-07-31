@@ -273,6 +273,140 @@ def merge_candidates(dense_results: list, sparse_results: list, final_top_k: int
 #     BM25 Retrieval              --/
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Query synonym expansion for BM25 (contract-domain specific)
+# ---------------------------------------------------------------------------
+# These synonyms expand the BM25 query so that user-friendly natural-language
+# terms retrieve chunks that use the contract's own terminology.
+# Only applied to BM25 (lexical); dense retrieval handles semantics itself.
+_QUERY_SYNONYMS: dict = {
+    # PENALTY / DAMAGES
+    "penalty":               ["penalty", "liquidated damages", "damages", "fine", "rs. 10,000"],
+    "liquidated damages":    ["liquidated damages", "penalty", "damages"],
+    "fine":                  ["penalty", "fine", "damages"],
+    "compensation":          ["compensation", "liquidated damages", "penalty", "damages for delay"],
+    "default":               ["default", "breach", "penalty", "liquidated damages"],
+    "breach":                ["breach", "breach of contract", "default", "penalty"],
+    "damages":               ["damages", "liquidated damages", "penalty"],
+    # DEFECTS / WARRANTY
+    "defect":                ["defect", "defects liability", "dlp", "defective"],
+    "defects":               ["defects", "defects liability", "dlp"],
+    "dlp":                   ["dlp", "defects liability period", "defect liability"],
+    "warranty":              ["warranty", "guarantee period", "defects liability"],
+    "guarantee period":      ["guarantee period", "warranty", "defects liability"],
+    # TESTING / COMMISSIONING
+    "testing":               ["testing", "commissioning", "test programme", "acceptance test"],
+    "commissioning":         ["commissioning", "testing", "integrated testing", "system acceptance"],
+    "system acceptance":     ["system acceptance test", "sat", "acceptance test", "commissioning"],
+    "sat":                   ["system acceptance test", "sat", "acceptance test"],
+    "integrated testing":    ["integrated testing", "integrated system test", "commissioning"],
+    "functional test":       ["functional test", "functional tests", "installation test", "testing"],
+    "trial running":         ["trial running", "trial run", "commissioning"],
+    "inspection":            ["inspection", "testing", "acceptance test"],
+    "handover":              ["handover", "completion", "takeover", "substantial completion"],
+    # SCOPE / OBLIGATIONS
+    "scope of work":         ["scope of work", "scope of supply", "contractor obligations", "responsibilities"],
+    "scope of supply":       ["scope of supply", "scope of work", "supply"],
+    "contractor obligations":["contractor obligations", "contractor responsibilities", "contractor shall"],
+    "employer obligations":  ["employer obligations", "employer responsibilities", "employer shall"],
+    "responsibilities":      ["responsibilities", "obligations", "contractor shall"],
+    "obligation":            ["obligation", "obligations", "contractor shall", "responsibilities"],
+    # INSTALLATION
+    "installation":          ["installation", "erection", "installation plan", "method statement"],
+    "method statement":      ["method statement", "installation plan", "programme"],
+    "resident staff":        ["resident staff", "contractor staff", "representative"],
+    # MAINTENANCE
+    "maintenance":           ["maintenance", "operation and maintenance", "dlp", "maintenance period"],
+    "operation and maintenance": ["operation and maintenance", "maintenance", "dlp"],
+    "annual maintenance":    ["annual maintenance contract", "amc", "maintenance beyond dlp"],
+    "amc":                   ["annual maintenance contract", "amc", "maintenance beyond dlp"],
+    "routine maintenance":   ["routine maintenance", "corrective maintenance", "maintenance procedures"],
+    "operation manual":      ["operation manual", "maintenance manual", "documentation"],
+    "maintenance manual":    ["maintenance manual", "operation manual", "documentation"],
+    # SPARE PARTS
+    "spare parts":           ["spare parts", "spares", "tools and test equipment"],
+    "spares":                ["spares", "spare parts", "tools and test equipment"],
+    "spares list":           ["spares list", "spare parts", "schedule of spares"],
+    "long lead time":        ["long lead time", "spare parts", "lead times"],
+    "shelf life":            ["shelf life", "storage requirement", "spare parts"],
+    "tools":                 ["tools", "test equipment", "tools and test equipment"],
+    # DOCUMENTS / DRAWINGS
+    "drawing":               ["drawing", "drawings and records", "as-built", "documentation"],
+    "as-built":              ["as-built drawing", "as built drawing", "final drawing"],
+    "submission":            ["submission", "drawings and documents", "notice to proceed"],
+    "notice to proceed":     ["notice to proceed", "commencement", "start date"],
+    # INTERFACES
+    "interfacing":           ["interfacing", "interface", "coordination", "interfacing contractor"],
+    "clearances":            ["clearances", "certificates", "statutory authorities", "interfacing agencies"],
+    "coordination":          ["coordination", "interface", "civil contractor"],
+    # SAFETY / ENVIRONMENT
+    "safety":                ["safety", "health and safety", "safety requirement"],
+    "health and safety":     ["health and safety", "safety requirement", "environmental"],
+    "environmental":         ["environmental", "environmental requirement", "safety"],
+    # INSURANCE / FINANCIAL SECURITY
+    "insurance":             ["insurance", "indemnity", "indemnification"],
+    "indemnity":             ["indemnity", "insurance", "indemnification"],
+    "retention":             ["retention", "retention money", "payment"],
+    "retention money":       ["retention money", "retention", "payment"],
+    "bank guarantee":        ["bank guarantee", "performance security", "performance bond"],
+    "performance security":  ["performance security", "performance bond", "bank guarantee"],
+    "mobilization":          ["mobilization", "mobilisation", "advance payment"],
+    "mobilisation":          ["mobilisation", "mobilization", "advance payment"],
+    # COMPLETION / DELAY
+    "completion":            ["completion", "time for completion", "completion period", "completion date"],
+    "delay":                 ["delay", "delay damages", "liquidated damages", "extension of time"],
+    "extension of time":     ["extension of time", "eot", "delay", "completion period"],
+    "eot":                   ["extension of time", "eot", "delay"],
+    # PAYMENT
+    "payment":               ["payment", "interim payment", "payment schedule", "retention"],
+    "interim payment":       ["interim payment", "payment certificate", "payment schedule"],
+    # DISPUTE / ARBITRATION
+    "dispute":               ["dispute", "arbitration", "dispute resolution", "adjudication"],
+    "arbitration":           ["arbitration", "dispute resolution", "adjudication"],
+    "jurisdiction":          ["jurisdiction", "applicable law", "dispute resolution", "arbitration"],
+    # VARIATION / CLAIMS
+    "variation":             ["variation", "variation order", "change order", "extra work"],
+    "change order":          ["change order", "variation", "variation order"],
+    "claims":                ["claims", "extra work", "variation", "dispute"],
+    # TRAINING
+    "training":              ["training", "training requirements", "staff training"],
+    # ECS / TVS / SYSTEMS
+    "ahu":                   ["air handling unit", "ahu", "air conditioning"],
+    "air handling":          ["air handling unit", "ahu", "air conditioning"],
+    "cooling tower":         ["cooling tower", "condenser", "chiller"],
+    "chiller":               ["chiller", "cooling tower", "refrigeration", "chilled water"],
+    "pump":                  ["pump", "chilled water pump", "condenser water pump"],
+    "tvs":                   ["tunnel ventilation", "tvs", "trackway exhaust", "ventilation"],
+    "tunnel ventilation":    ["tunnel ventilation", "tvs", "trackway exhaust"],
+    "ecs":                   ["environment control system", "ecs", "air conditioning"],
+    "bms":                   ["building management system", "bms", "scada"],
+    "verification and validation": ["verification", "validation", "design verification"],
+    "performance requirements": ["performance requirements", "design conditions", "specifications"],
+}
+
+
+def _expand_query_for_bm25(query: str) -> str:
+    """Returns an expanded query string for BM25 by appending synonym terms.
+
+    Only used for BM25 (lexical). Dense retrieval handles semantic similarity
+    without expansion. The expansion is additive — original query words are
+    always kept so exact matches are never lost.
+
+    Example:
+        "what is the penalty" → "what is the penalty liquidated damages damages fine"
+    """
+    q_lower = query.lower()
+    extra_terms = []
+    for trigger, synonyms in _QUERY_SYNONYMS.items():
+        if trigger in q_lower:
+            for syn in synonyms:
+                if syn not in q_lower and syn not in extra_terms:
+                    extra_terms.append(syn)
+    if extra_terms:
+        return query + " " + " ".join(extra_terms)
+    return query
+
+
 def hybrid_search(
     query: str,
     top_k_dense: int = TOP_K_DENSE,
@@ -295,7 +429,10 @@ def hybrid_search(
     dense_results = dense_search(query, top_k=top_k_dense, metadata_filter=metadata_filter)
 
     bm25_index = get_bm25_index()
-    sparse_results = bm25_index.search(query, top_k=top_k_bm25, metadata_filter=metadata_filter)
+    # Expand query for BM25 with domain synonyms (e.g. "penalty" → adds
+    # "liquidated damages", "damages", "fine" for better recall)
+    bm25_query = _expand_query_for_bm25(query)
+    sparse_results = bm25_index.search(bm25_query, top_k=top_k_bm25, metadata_filter=metadata_filter)
 
     if RAG_DEBUG:
         _debug_clause_block("Dense Results", dense_results)

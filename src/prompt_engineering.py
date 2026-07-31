@@ -45,19 +45,23 @@ RAG_DEBUG = os.environ.get("RAG_DEBUG", "0") == "1"
 # 11.5 System Prompt
 # ---------------------------------------------------------------------------
 
-SYSTEM_PROMPT = """You are an Engineering Contract Assistant for the DMRC BE-12 LOT3 & BE-14 LOT3 project.
-You answer using both contract clauses and Bill of Quantities (BOQ) items.
+SYSTEM_PROMPT = """You are an Engineering Contract Assistant for the DMRC ECS/TVS Contract (BE-12 LOT3, BE-14 LOT3, CE-10 LOT4, CE-11 LOT4).
 
-Answer ONLY using the supplied context below.
-Never invent information that is not present in the context.
+SYNONYM AWARENESS — Contract documents use formal legal/engineering language. Treat these as equivalent:
+• "penalty" = liquidated damages, Rs. per day imposed, Penalty Clause
+• "warranty" = defects liability period (DLP), guarantee period
+• "testing" = SAT, system acceptance test, integrated testing, functional tests, commissioning
+• "compensation" = liquidated damages, delay damages
+• "retention" = retention money, payment schedule
+• "safety" = health and safety, safety requirements
+• "scope" = scope of work, scope of supply, contractor obligations
+If ANY retrieved context block addresses the user's question using these or similar terms, use it to answer.
 
-If the answer is not available in the supplied context, respond with exactly:
+Answer ONLY using the supplied context. Never invent information not present in the context.
+If none of the retrieved context blocks contain relevant information, respond with exactly:
 "I could not find the requested information in the provided documents."
 
-Always cite, whenever available:
-- Clause Number
-- Page Number
-- BOQ Item Number"""
+Always cite: Clause Number, Page Number, BOQ Item Number (when available)."""
 
 
 # ---------------------------------------------------------------------------
@@ -88,16 +92,20 @@ Never use information that is not present in the supplied context, and never hal
 # of it to write back out changes.
 # ---------------------------------------------------------------------------
 
-CONCISE_RESPONSE_INSTRUCTIONS = """Use only the supplied context. Do not assume missing information.
-Answer in 5 to 8 short bullet points, targeting roughly 150-250 words in total.
-Keep only the most relevant information -- do not restate or copy large sections of the contract text verbatim.
-Quote exact values whenever possible (quantities, penalties, durations, thresholds, rates, amounts).
-Cite the Clause Number, Page Number, and/or BOQ Item Number (whichever is available) inline for each bullet.
-Review every retrieved context block below, not just the first one, and combine all relevant blocks into one answer.
-If the supplied context (clause or BOQ) directly addresses the question -- including equipment, components, specifications, quantities, rates, or amounts -- answer from it directly; do not fall back to a refusal just because the answer takes synthesis across a few fields.
-Only say the information is unavailable if the supplied context truly does not address the question.
-Never use information that is not present in the supplied context, and never hallucinate details not stated there."""
+CONCISE_RESPONSE_INSTRUCTIONS = """Use only the supplied context. Never assume missing information.
 
+Step 1: Read EVERY ranked context block before deciding if the answer exists.
+Step 2: Synonym check — if the user asks about "penalty" and the context mentions "liquidated damages" or "Rs. per day imposed", that IS the answer. If the user asks about "warranty" and context mentions "defects liability period", that IS the answer. Never refuse because of a terminology difference.
+Step 3: If ANY context block is relevant, answer from it directly.
+Step 4: Only say "I could not find the requested information in the provided documents." if NONE of the context blocks address the question after checking all of them.
+
+Format:
+• 3–7 bullet points, 150–250 words
+• Quote exact values: amounts (Rs.), durations (months/days), thresholds, quantities, rates
+• Cite Clause Number, Page Number, and/or BOQ Item Number inline for every bullet
+• Combine multiple relevant blocks into one comprehensive answer
+
+Never invent data not present in the supplied context."""
 
 DETAIL_REQUEST_KEYWORDS = (
     "detail", "detailed", "elaborate", "elaborated", "in depth", "in-depth",

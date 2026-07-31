@@ -103,13 +103,70 @@ _CLAUSE_KEYWORDS: frozenset = frozenset({
     "staff training", "training obligations",
     "operation and maintenance",
     "spare parts", "tools and test equipment",
-    # clause reference words (without an actual clause number)
+    # clause reference words
     "clause", "sub-clause", "article", "section",
-    # ISSUE 4 FIX: "contractor obligation" (singular) was already present but,
-    # per the word-boundary matcher, did not match "contractor obligations"
-    # (plural) as used in real queries ("s" immediately follows "obligation",
-    # so \b fails there). Adding the plural form covers both phrasings.
-    "contractor obligations",
+    # Penalty / damages / liability
+    "penalty", "penalty clause",
+    "liquidated damages", "liquidated damage",
+    "delay damages", "damages for delay", "damages",
+    "fine", "compensation", "default", "breach", "breach of contract",
+    "performance guarantee", "performance bond",
+    "bank guarantee",
+    # Contractor/employer obligations
+    "contractor obligations", "contractor obligation",
+    "contractor responsibilities", "contractor responsible",
+    "employer obligations", "employer responsibility",
+    # Testing / commissioning / acceptance
+    "testing", "commissioning", "test programme",
+    "system acceptance test", "acceptance test", "sat",
+    "integrated testing", "integrated system test",
+    "functional test", "functional tests",
+    "installation test", "installation tests",
+    "trial running", "trial run",
+    "test records", "test report",
+    "inspection",
+    # Scope / supply
+    "scope of supply", "contractor supply",
+    # Installation
+    "installation guidelines", "installation requirement",
+    # Maintenance / AMC
+    "annual maintenance", "annual maintenance contract", "amc",
+    "routine maintenance", "corrective maintenance",
+    "maintenance procedure", "maintenance procedures",
+    "preventive maintenance",
+    "operation manual", "maintenance manual",
+    # Spares
+    "spares list", "spare list",
+    "long lead time", "shelf life",
+    "second source", "second sourcing",
+    # Documents / drawings
+    "as-built drawing", "as built drawing",
+    "document submission", "drawing submission",
+    "drawings and documents",
+    # Interfaces
+    "interfacing", "interfacing contractor", "interfacing contractors",
+    "interfacing agency", "interfacing agencies",
+    "civil contractor", "clearances", "obtaining clearances",
+    # Safety / environment
+    "safety requirement", "safety obligation",
+    "environmental requirement", "environmental obligation",
+    # Insurance / retention / payment security
+    "retention", "retention money",
+    "mobilization", "mobilisation", "mobilization advance",
+    # Extension / time / completion
+    "extension of time", "eot",
+    "completion period", "time for completion",
+    # Jurisdiction / dispute
+    "jurisdiction", "applicable law",
+    # Supply / obligations (missing plurals)
+    "responsibilities",
+    "defaults",
+    "contractor to supply", "contractor shall supply",
+    # Design / verification
+    "verification and validation", "design verification",
+    "performance requirements", "performance requirement",
+    # Handover / takeover
+    "handover", "takeover", "substantial completion",
 })
 
 # BOQ-domain keywords (bill of quantities / materials / civil works).
@@ -122,7 +179,7 @@ _BOQ_KEYWORDS: frozenset = frozenset({
     "drainage", "culvert", "manhole",
     "track", "rail", "sleeper", "ballast",
     # electrical / mechanical (BOQ-specific terms in this corpus)
-    "busbar", "bus bar",
+    "busbar", "bus bar", "bus coupler", "buscoupler",
     "air circuit breaker", "acb",
     "mccb", "mcb",
     "chiller", "cooling tower",
@@ -140,6 +197,10 @@ _BOQ_KEYWORDS: frozenset = frozenset({
     "supply and install", "supply and erect", "furnish",
     "cable", "conduit", "duct", "tray",
     "earthing", "lightning protection",
+    # Electrical panel / equipment BOQ terms
+    "main plant panel", "distribution board", "sub distribution board",
+    "main distribution board", "mdb", "sdb",
+    "panel specification", "switchboard specification",
     # ISSUE 5 FIX: financial BOQ / tender-summary keywords were missing
     # entirely. Terms verified against the actual corpus (data/boq_part1.json:
     # "Tender Total", "Revised Tender Total", "Discount Letter", "ECS Works",
@@ -154,6 +215,11 @@ _BOQ_KEYWORDS: frozenset = frozenset({
     "ecs works", "tvs works",
     "part-a", "part-b", "part-c", "part-d", "part-e", "part-f",
     "part-g", "part-h", "part-i", "part-j", "part-k", "part-l",
+    # Additional financial / BOQ terms missing from original set
+    "bms works", "bms value",
+    "contract sum", "contract total",
+    "training manuals", "training manual",
+    "amc beyond dlp", "amc beyond", "amc value",
 })
 
 
@@ -186,6 +252,12 @@ def classify_query(query: str) -> IntentResult:
     q_lower = query.lower().strip()
 
     # ------------------------------------------------------------------
+    # 0. Explicit 'BOQ' mention or 'item N' pattern → always BOQ intent.
+    # ------------------------------------------------------------------
+    if (re.search(r'\b(boq|bill of quantities)\b', q_lower) and re.search(r'\d', q_lower))             or re.search(r'\bitem\s+\d', q_lower):
+        return IntentResult("boq", _BOQ_FILTER, "explicit 'BOQ'/'item N' reference in query")
+
+    # ------------------------------------------------------------------
     # 1. Explicit identifier signals (highest priority).
     # ------------------------------------------------------------------
     # BOQ item pattern must be checked BEFORE the clause pattern because
@@ -206,6 +278,17 @@ def classify_query(query: str) -> IntentResult:
     # ------------------------------------------------------------------
     # 2. Keyword signals.
     # ------------------------------------------------------------------
+    # Priority multi-word BOQ terms checked before single-word clause terms
+    # so 'amc beyond dlp' wins over the single 'dlp' clause keyword.
+    _PRIORITY_BOQ_TERMS = frozenset({
+        "amc beyond dlp", "amc beyond",
+        "bms works", "ecs works", "tvs works",
+        "contract sum", "training manuals", "training manual",
+    })
+    priority_boq = _keyword_hit(q_lower, _PRIORITY_BOQ_TERMS)
+    if priority_boq:
+        return IntentResult("boq", _BOQ_FILTER, f"priority BOQ keyword: {priority_boq!r}")
+
     clause_hit = _keyword_hit(q_lower, _CLAUSE_KEYWORDS)
     boq_hit    = _keyword_hit(q_lower, _BOQ_KEYWORDS)
 
@@ -216,8 +299,17 @@ def classify_query(query: str) -> IntentResult:
         return IntentResult("boq", _BOQ_FILTER, f"BOQ keyword: {boq_hit!r}")
 
     if clause_hit and boq_hit:
-        # Ambiguous: both clause and BOQ keywords fired.  Fall through to
-        # GENERAL so neither type is excluded from retrieval.
+        # If the BOQ signal is an explicit BOQ structural word, BOQ wins.
+        _EXPLICIT_BOQ_WINS = frozenset({
+            "boq", "bill of quantities", "schedule of quantities",
+            "unit rate", "lump sum", "provisional sum",
+            "tender total", "revised tender total", "contract sum",
+            "total contract value", "contract value",
+        })
+        if boq_hit in _EXPLICIT_BOQ_WINS:
+            return IntentResult("boq", _BOQ_FILTER,
+                                f"explicit BOQ keyword wins ambiguity: {boq_hit!r}")
+        # Otherwise general (unfiltered pool).
         return IntentResult(
             "general", None,
             f"ambiguous (clause={clause_hit!r}, boq={boq_hit!r}): searching unfiltered pool",
@@ -247,7 +339,17 @@ def _word_match(text: str, keyword: str) -> bool:
 
     Handles both single-word ("earthwork") and multi-word ("cooling tower")
     keywords without requiring callers to pre-compile regexes for every term.
+
+    Plural/singular tolerance: if the keyword ends in a common noun suffix,
+    also matches with an optional trailing "s" so "safety requirement" matches
+    "safety requirements", "drawing" matches "drawings", etc.  This avoids
+    having to enumerate every plural form explicitly in the keyword list.
     """
-    # Escape special regex chars in the keyword (handles "star-delta" etc.)
-    pattern = r"\b" + re.escape(keyword) + r"\b"
-    return bool(re.search(pattern, text))
+    escaped = re.escape(keyword)
+    # Base match (exact)
+    if re.search(r"\b" + escaped + r"\b", text):
+        return True
+    # Plural tolerance: keyword + optional "s" or "es"
+    if re.search(r"\b" + escaped + r"e?s\b", text):
+        return True
+    return False
