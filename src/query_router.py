@@ -48,6 +48,8 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
+from .text_stem import shares_stem
+
 # ---------------------------------------------------------------------------
 # Reuse the same compiled patterns from query.py so the two modules always
 # agree on what looks like a clause number or BOQ item number.  Import is
@@ -288,15 +290,24 @@ def classify_query(query: str) -> IntentResult:
     # 2. Keyword signals.
     # ------------------------------------------------------------------
     # Priority multi-word BOQ terms checked before single-word clause terms
-    # so 'amc beyond dlp' wins over the single 'dlp' clause keyword.
+    # so 'amc ... beyond ... dlp' wins over the single 'dlp' clause keyword.
     _PRIORITY_BOQ_TERMS = frozenset({
-        "amc beyond dlp", "amc beyond",
         "bms works", "ecs works", "tvs works",
         "contract sum", "training manuals", "training manual",
     })
     priority_boq = _keyword_hit(q_lower, _PRIORITY_BOQ_TERMS)
     if priority_boq:
         return IntentResult("boq", _BOQ_FILTER, f"priority BOQ keyword: {priority_boq!r}")
+
+    # Phase 1 round-2 fix: gap-tolerant AMC-beyond-DLP detection, so any
+    # word inserted between the two anchors ("AMC value beyond DLP",
+    # "AMC cost beyond DLP", "AMC amount beyond DLP", "Annual Maintenance
+    # Contract charges beyond DLP", ...) is still recognised as a BOQ
+    # financial-value question rather than falling through to GENERAL.
+    if _words_present_within_span(q_lower, ("amc", "dlp")):
+        return IntentResult("boq", _BOQ_FILTER, "AMC/DLP financial-value pattern")
+    if _words_present_within_span(q_lower, ("annual", "maintenance", "contract", "dlp"), max_span=8):
+        return IntentResult("boq", _BOQ_FILTER, "Annual Maintenance Contract/DLP financial-value pattern")
 
     clause_hit = _keyword_hit(q_lower, _CLAUSE_KEYWORDS)
     boq_hit    = _keyword_hit(q_lower, _BOQ_KEYWORDS)
@@ -330,6 +341,36 @@ def classify_query(query: str) -> IntentResult:
     return IntentResult("general", None, "no domain signal detected")
 
 
+def _words_present_within_span(text: str, words: tuple, max_span: int = 6) -> bool:
+    """True if every word in `words` appears in `text` (word-boundary,
+    order-independent), with the first and last matched positions no
+    more than `max_span` words apart.
+
+    Phase 1 round-2 fix: the previous priority-phrase matcher required
+    an exact contiguous substring ("amc beyond dlp"), which breaks the
+    moment a user inserts a word in the middle -- "AMC VALUE beyond
+    DLP", "AMC COST beyond DLP", "AMC AMOUNT beyond DLP" all fail a
+    literal substring check even though they are obviously the same
+    question. Checking "are these words all present, close together"
+    instead of "does this exact phrase appear" generically covers any
+    inserted word (value/cost/amount/charges/anything else a user
+    might type) without enumerating each variant.
+    """
+    tokens = re.findall(r"[a-z0-9]+", text)
+    positions = {}
+    for w in words:
+        idxs = [i for i, t in enumerate(tokens) if t == w]
+        if not idxs:
+            return False
+        positions[w] = idxs
+    # Find the tightest window across one occurrence of each word.
+    import itertools
+    for combo in itertools.product(*(positions[w] for w in words)):
+        if max(combo) - min(combo) <= max_span:
+            return True
+    return False
+
+
 def _keyword_hit(q_lower: str, keywords: frozenset) -> Optional[str]:
     """Return the first keyword from `keywords` that appears as a
     word-boundary match in `q_lower`, or None if none match.
@@ -353,6 +394,14 @@ def _word_match(text: str, keyword: str) -> bool:
     also matches with an optional trailing "s" so "safety requirement" matches
     "safety requirements", "drawing" matches "drawings", etc.  This avoids
     having to enumerate every plural form explicitly in the keyword list.
+
+    Verb-form tolerance (Phase 1 round-2 fix): for single-word keywords,
+    also matches any word in `text` that shares a stem with the keyword
+    (see text_stem.py) -- e.g. keyword "training" matches "trains",
+    "trained", "trainer" without those forms being listed explicitly.
+    Only applied to single-word keywords: stemming a multi-word phrase
+    word-by-word would risk matching unrelated combinations, which the
+    plain substring check above already handles correctly for phrases.
     """
     escaped = re.escape(keyword)
     # Base match (exact)
@@ -361,4 +410,9 @@ def _word_match(text: str, keyword: str) -> bool:
     # Plural tolerance: keyword + optional "s" or "es"
     if re.search(r"\b" + escaped + r"e?s\b", text):
         return True
+    # Verb-form tolerance: single-word keywords only.
+    if " " not in keyword:
+        for token in re.findall(r"[A-Za-z]+", text):
+            if shares_stem(token, keyword):
+                return True
     return False

@@ -34,6 +34,7 @@ from rank_bm25 import BM25Okapi
 
 from .storage import get_collection
 from .text_normalization import build_embedding_input, build_boq_embedding_input
+from .text_stem import stem_candidates
 
 
 # ---------------------------------------------------------------------------
@@ -129,6 +130,47 @@ class BM25Index:
         tokenized_corpus = [tokenize(doc) for doc in enriched_corpus]
         self._bm25 = BM25Okapi(tokenized_corpus)
 
+        # PHASE 1 ROUND-2 FIX -- query-time stem expansion.
+        #
+        # Root cause: a BOQ chunk saying "busbars rated at 2500 A"
+        # scores 0 against the query term "rating" -- "rated" and
+        # "rating" are different literal tokens, and BM25 has no notion
+        # that they are the same underlying word. This silently
+        # excludes an exact-content match from ever contributing score,
+        # while unrelated chunks that happen to literally contain
+        # "rating" (a common word appearing in many BOQ boilerplate
+        # sub-items) dominate instead.
+        #
+        # Fix: build a stem -> {actual corpus terms} index once here,
+        # and expand each QUERY token at search time to also include
+        # any corpus term sharing its stem (see text_stem.py). This
+        # only affects which corpus terms a query looks up -- the
+        # indexed corpus itself, and every OTHER already-working exact
+        # match, is completely unchanged.
+        self._stem_to_terms: dict = {}
+        vocabulary = {tok for doc_tokens in tokenized_corpus for tok in doc_tokens}
+        for term in vocabulary:
+            for stem in stem_candidates(term):
+                self._stem_to_terms.setdefault(stem, set()).add(term)
+
+    def _expand_query_terms(self, tokenized_query: list) -> list:
+        """Returns `tokenized_query` plus any corpus vocabulary term that
+        shares a stem with one of its tokens (see class docstring above
+        for why). Duplicate-safe: BM25Okapi sums a distinct term's IDF
+        contribution once per document regardless of how many times it
+        appears in the query token list, so adding an already-present
+        term again is a harmless no-op, not a double-count.
+        """
+        expanded = list(tokenized_query)
+        seen = set(tokenized_query)
+        for tok in tokenized_query:
+            for stem in stem_candidates(tok):
+                for related_term in self._stem_to_terms.get(stem, ()):
+                    if related_term not in seen:
+                        expanded.append(related_term)
+                        seen.add(related_term)
+        return expanded
+
     def _matches_filter(self, metadata: dict, metadata_filter: Optional[dict]) -> bool:
         """Applies the same equality-based filter semantics as ChromaDB's
         `where` clause in query.py's dense search -- every key in the
@@ -155,9 +197,13 @@ class BM25Index:
         the two result lists can be merged uniformly in hybrid_retriever.py.
         """
         tokenized_query = tokenize(query)
+        # PHASE 1 ROUND-2 FIX: expand with same-stem corpus terms (e.g.
+        # query "rating" also looks up corpus term "rated") before
+        # scoring -- see _expand_query_terms()'s docstring.
+        expanded_query = self._expand_query_terms(tokenized_query)
         # get_scores returns one float per corpus document, aligned by
         # index with self.chunk_ids/self.documents/self.metadatas.
-        scores = self._bm25.get_scores(tokenized_query)
+        scores = self._bm25.get_scores(expanded_query)
 
         candidates = []
         for idx, score in enumerate(scores):
