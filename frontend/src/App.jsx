@@ -42,7 +42,15 @@ const SUGGESTION_GROUPS = [
 export default function App() {
   const [messages, setMessages] = useState([]);
   const [pending, setPending] = useState(false);
-  const [viewed, setViewed] = useState(null); // a SourceItem or null
+  // PHASE 2 (Evidence Viewer) -- Feature 1: Previous/Next now walk the
+  // retrieved evidence list for the current answer (ordered by retrieval
+  // score, i.e. `sources` as returned by the API) instead of the PDF's
+  // own page sequence. `active` tracks *which* message's evidence list
+  // is open and *which position* in it, rather than a single detached
+  // source object -- that position is what both the PageViewer's
+  // Previous/Next buttons and the highlighted SourceChip (Feature 2)
+  // read from, so the two always stay in sync by construction.
+  const [active, setActive] = useState(null); // { msgIndex, index } | null
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -56,8 +64,11 @@ export default function App() {
 
     try {
       const { answer, sources, confidence } = await askQuestion(query);
-      const firstWithImage = (sources || []).find((s) => s.image_url);
-      if (firstWithImage) setViewed(firstWithImage);
+      const newMsgIndex = messages.length + 1; // this assistant message's future index
+      const firstImageIndex = (sources || []).findIndex((s) => s.image_url);
+      if (firstImageIndex !== -1) {
+        setActive({ msgIndex: newMsgIndex, index: firstImageIndex });
+      }
       setMessages((m) => [
         ...m,
         { role: "assistant", content: answer, sources, confidence },
@@ -74,6 +85,22 @@ export default function App() {
     } finally {
       setPending(false);
     }
+  }
+
+  // The evidence list currently open in the PageViewer, and the active
+  // source within it -- both derived from `active` + `messages` so
+  // there is exactly one source of truth (no risk of the viewer and the
+  // highlighted chip drifting apart, per Feature 2).
+  const activeSources = active ? messages[active.msgIndex]?.sources || [] : null;
+  const activeSource = activeSources ? activeSources[active.index] : null;
+
+  function viewEvidence(msgIndex, index) {
+    setActive({ msgIndex, index });
+  }
+
+  function navigateEvidence(newIndex) {
+    if (!active) return;
+    setActive({ msgIndex: active.msgIndex, index: newIndex });
   }
 
   return (
@@ -165,7 +192,13 @@ export default function App() {
         ) : (
           <div className="msg-list">
             {messages.map((m, i) => (
-              <Message key={i} {...m} onViewSource={setViewed} />
+              <Message
+                key={i}
+                {...m}
+                msgIndex={i}
+                activeChunkId={active && active.msgIndex === i ? activeSource?.chunk_id : null}
+                onViewSource={(index) => viewEvidence(i, index)}
+              />
             ))}
             {pending && <Message role="assistant" isLoading />}
           </div>
@@ -183,7 +216,12 @@ export default function App() {
         </p>
       </footer>
       </div>
-      <PageViewer source={viewed} onClose={() => setViewed(null)} />
+      <PageViewer
+        sources={activeSources}
+        activeIndex={active?.index ?? null}
+        onNavigate={navigateEvidence}
+        onClose={() => setActive(null)}
+      />
       </div>
     </div>
   );

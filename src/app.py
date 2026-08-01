@@ -214,6 +214,15 @@ class SourceItem(BaseModel):
     reranker_score: Optional[float] = None
     chunk_id: Optional[str] = None
     max_pdf_page: Optional[int] = None  # total pages available for this doc_id
+    # PHASE 2 (Evidence Viewer) -- richer evidence cards.
+    # Both fields are populated from metadata that already exists in
+    # ChromaDB (clause "heading", BOQ chunk's own indexed text) -- no
+    # ingestion/embedding/retrieval change, purely additive on the
+    # response side. Optional/back-compat: None when not applicable
+    # (e.g. a clause chunk with no transcribed heading, or when the
+    # candidate's own metadata simply doesn't carry one).
+    heading: Optional[str] = None       # clause title, e.g. "Penalty Clause"
+    description: Optional[str] = None   # short BOQ item description (~100 chars)
     # TASK 3 -- UI retrieval label fix. Exposes the existing
     # metadata["chunk_type"] ("clause" or "boq", set unconditionally by
     # metadata_loader.py for every chunk) so the frontend can render
@@ -680,6 +689,26 @@ def _build_sources(
         # can disable the next-page button when the user reaches the end.
         max_pdf_page = _MAX_PDF_PAGE.get(doc_id) if doc_id else None
 
+        # PHASE 2 (Evidence Viewer) -- richer evidence cards (Feature 3).
+        # Clause title: metadata["heading"] already exists (transcribed
+        # per-clause, e.g. "Penalty Clause", "Scope and Purpose") but was
+        # never exposed on the wire. Empty string is normalised to None
+        # so the frontend's `heading || fallback` logic works the same
+        # way it already does for every other optional field here.
+        heading = metadata.get("heading") or None if not is_boq else None
+
+        # BOQ short description: no separate "description" metadata field
+        # exists, but the chunk's own indexed body text (candidate["document"]
+        # -- the same text already shown in the answer/prompt context) is a
+        # natural short description. Truncated to keep the evidence card
+        # compact; not a retrieval change, purely a display-side excerpt of
+        # data already retrieved for this candidate.
+        description = None
+        if is_boq:
+            body_text = (candidate.get("document") or "").strip()
+            if body_text:
+                description = body_text[:100] + ("…" if len(body_text) > 100 else "")
+
         sources.append(
             SourceItem(
                 clause=metadata.get("clause_no"),
@@ -698,6 +727,8 @@ def _build_sources(
                 chunk_type=metadata.get("chunk_type"),
                 query_intent=query_intent,       # TASK 4
                 max_pdf_page=max_pdf_page,       # navigation bound for PageViewer
+                heading=heading,                 # PHASE 2: clause title
+                description=description,         # PHASE 2: short BOQ description
             )
         )
     return sources

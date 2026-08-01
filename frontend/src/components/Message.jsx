@@ -8,7 +8,7 @@
 // for click behaviour.
 import SourceChip from "./SourceChip.jsx";
 
-export default function Message({ role, content, isError, isLoading, sources, onViewSource }) {
+export default function Message({ role, content, isError, isLoading, sources, activeChunkId, onViewSource }) {
   const isUser = role === "user";
 
   return (
@@ -33,7 +33,12 @@ export default function Message({ role, content, isError, isLoading, sources, on
         {!isUser && !isLoading && sources && sources.length > 0 && (
           <div className="source-chip-row">
             {sources.map((s, i) => (
-              <SourceChip key={s.chunk_id || i} source={s} onView={onViewSource} />
+              <SourceChip
+                key={s.chunk_id || i}
+                source={s}
+                active={activeChunkId != null && s.chunk_id === activeChunkId}
+                onView={onViewSource ? () => onViewSource(i) : undefined}
+              />
             ))}
           </div>
         )}
