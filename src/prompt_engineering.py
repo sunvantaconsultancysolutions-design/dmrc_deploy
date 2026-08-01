@@ -73,7 +73,7 @@ Always cite: Clause Number, Page Number, BOQ Item Number (when available)."""
 
 RESPONSE_INSTRUCTIONS = """Use only the supplied context. Do not assume missing information.
 Quote exact values whenever possible (quantities, penalties, durations, thresholds).
-Cite the Clause Number, Page Number, and BOQ Item Number (if available) for every claim.
+Cite the Clause Number, Page Number, and BOQ Item Number (if available) for every claim, copied exactly from that same context block's own header -- never write a number from memory, never combine numbers from two different blocks.
 Clearly say so if the requested information is unavailable in the context.
 Generate a concise, engineering-style response.
 Review every retrieved context block below, not just the first one.
@@ -101,6 +101,8 @@ Step 1: Read EVERY ranked context block before deciding if the answer exists.
 Step 2: Meaning check, not word-matching — if a context block describes the same real-world thing the user asked about (an equipment spec that answers a "rating" question, a clause that describes who does the training, a BOQ line whose category covers what was asked), that IS the answer, even if the exact question words never appear in the text. Never refuse just because of a wording or terminology difference.
 Step 3: If ANY context block answers the question by meaning, you MUST answer from it directly. Do not refuse a question that a retrieved block already answers just because the match feels partial, indirect, or the confidence score is not high — a present, on-topic context block always outranks refusing.
 Step 4: Only say "I could not find the requested information in the provided documents." if, after reading every block, none of them describe the thing being asked about at all.
+
+Citation rule (do not skip this): every "Rank N" block already states its own Clause Number / BOQ Item Number / Page in its header line. When you write a bullet from that block, copy that EXACT number from that SAME block's header — never write a clause or item number from memory, never combine or average numbers from two different blocks, and never guess a nearby number that "seems close enough." If a block's header has no number, cite it as "(number unavailable)" rather than inventing one.
 
 Format:
 • 3–7 bullet points, 150–250 words
