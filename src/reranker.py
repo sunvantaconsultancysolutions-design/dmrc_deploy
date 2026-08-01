@@ -63,6 +63,8 @@ from typing import Any, Dict, List
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
+from .text_normalization import build_embedding_input, build_boq_embedding_input
+
 MODEL_NAME = "BAAI/bge-reranker-v2-m3"
 
 DEFAULT_TOP_N = 10       # how many re-ranked results are returned to the caller
@@ -102,6 +104,41 @@ def get_reranker_model():
 # ---------------------------------------------------------------------------
 # 10.3  Pairwise Scoring
 # ---------------------------------------------------------------------------
+
+def _enrich_for_scoring(candidate: Dict[str, Any]) -> str:
+    """Returns the SAME clause_no/heading/BOQ-item-enriched text already
+    used for dense embedding (main.py's _build_embedding_text()) and, as
+    of the BM25 label-indexing fix, for BM25 too -- so the reranker's
+    cross-encoder is not the only stage still scoring the bare stored
+    body text.
+
+    Root cause this addresses: a query like "How much is Part-H worth?"
+    or "What is the ACB rating?" is matched correctly by BM25/dense
+    against the candidate's *metadata* (s_no="PART-H", enclosing panel
+    context, etc.), but until this fix the reranker only ever saw the
+    bare paragraph -- e.g. "BOQ for Additional Miscellaneous Items --
+    Total Amount: Rs. 3,65,63,350...", which never literally says
+    "Part-H" -- so the cross-encoder had no way to recognise this chunk
+    IS the answer to a query that names the item by its label. The
+    reranker's own relevance score would then legitimately come out low
+    for a candidate that is, in fact, exactly on topic, and a
+    genuinely-relevant chunk would fail the confidence gate purely for
+    lack of the same context the other two retrieval signals already had.
+
+    Metadata-only, no re-embedding, no ChromaDB write -- purely changes
+    what text is handed to the already-loaded cross-encoder model.
+    """
+    metadata = candidate.get("metadata") or {}
+    document = candidate.get("document") or ""
+    if metadata.get("chunk_type") == "boq":
+        return build_boq_embedding_input(metadata, document)
+    return build_embedding_input(
+        metadata.get("clause_no", ""),
+        metadata.get("heading", ""),
+        metadata.get("section_heading", ""),
+        document,
+    )
+
 
 def _score_pairs(
     query: str,
@@ -205,7 +242,9 @@ def rerank(
     if not candidates:
         return []
 
-    documents = [c["document"] for c in candidates]
+    # FIX: score the same enriched (label-aware) text BM25 and dense
+    # embedding already use -- see _enrich_for_scoring()'s docstring.
+    documents = [_enrich_for_scoring(c) for c in candidates]
     scores = _score_pairs(query, documents, batch_size=batch_size, max_length=max_length)
 
     reranked = []
@@ -435,21 +474,30 @@ def expand_with_siblings(
     # Lazy import: mirrors reranker.py's existing pattern of not taking a
     # hard dependency on the retriever/query module layout at import time
     # (see this file's own main()/hybrid_search import comment above).
-    from .query import get_chunks_by_parent_clause
+    from .query import get_chunks_by_parent_clause, get_chunks_by_boq_parent
 
     already_included_ids = {c["chunk_id"] for c in reranked}
 
-    # Group already-reranked entries by parent_clause.
-    families: Dict[str, List[Dict[str, Any]]] = {}
+    # Group already-reranked entries by family. CLAUSE_FIX: BOQ chunks
+    # are grouped by metadata["parent"] (not "parent_clause", which only
+    # exists on clause chunks -- see get_chunks_by_boq_parent()'s
+    # docstring for why this was previously a silent no-op for every
+    # BOQ query). The family key is (kind, parent) so a clause
+    # parent_clause value and a BOQ parent value that happen to be the
+    # same literal string (e.g. both "1") are never merged together --
+    # they come from unrelated ID schemes.
+    families: Dict[tuple, List[Dict[str, Any]]] = {}
     for c in reranked:
-        parent = (c.get("metadata") or {}).get("parent_clause")
+        metadata = c.get("metadata") or {}
+        is_boq = metadata.get("chunk_type") == "boq"
+        parent = metadata.get("parent") if is_boq else metadata.get("parent_clause")
         if not parent:
             continue
-        families.setdefault(parent, []).append(c)
+        families.setdefault(("boq" if is_boq else "clause", parent), []).append(c)
 
     additions: List[Dict[str, Any]] = []
 
-    for parent, members in families.items():
+    for (kind, parent), members in families.items():
         if len(additions) >= max_total_extra:
             break
         if len(members) < sibling_trigger:
@@ -457,7 +505,7 @@ def expand_with_siblings(
 
         weakest_included_score = min(m["reranker_score"] for m in members)
 
-        siblings = get_chunks_by_parent_clause(parent)
+        siblings = get_chunks_by_boq_parent(parent) if kind == "boq" else get_chunks_by_parent_clause(parent)
         candidate_siblings = [s for s in siblings if s["chunk_id"] not in already_included_ids]
         if not candidate_siblings:
             continue
@@ -467,7 +515,7 @@ def expand_with_siblings(
         # rather than guessed. This is a small extra call (typically 1-7
         # short documents for a clause family in this corpus), not a
         # second retrieval pass.
-        sibling_scores = _score_pairs(query, [s["document"] for s in candidate_siblings])
+        sibling_scores = _score_pairs(query, [_enrich_for_scoring(s) for s in candidate_siblings])
 
         scored_siblings = sorted(
             zip(candidate_siblings, sibling_scores), key=lambda pair: pair[1], reverse=True

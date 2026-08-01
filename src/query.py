@@ -341,6 +341,41 @@ def get_chunk_by_boq_item_no(item_no: str):
 # the first caller.
 # ---------------------------------------------------------------------------
 
+def get_chunks_by_boq_parent(parent: str):
+    """BOQ equivalent of get_chunks_by_parent_clause() above.
+
+    Root cause this addresses: expand_with_siblings() (reranker.py)
+    groups already-reranked candidates by metadata["parent_clause"] to
+    find "whole family" questions -- but that field only exists on
+    CLAUSE chunks. BOQ chunks record the same kind of item-hierarchy
+    relationship under a differently-named field, metadata["parent"]
+    (e.g. sub-items "a)", "b)", "c)" all sharing parent="1.02.E.2"), so
+    every BOQ candidate's parent_clause lookup was silently empty,
+    meaning BOQ queries never benefited from the borderline-confidence
+    sibling-expansion recovery that clause queries already had.
+
+    Returns [] if parent is falsy or nothing matches, matching
+    get_chunks_by_parent_clause()'s defensive-empty-list convention.
+    """
+    if not parent:
+        return []
+
+    collection = get_collection()
+    result = collection.get(
+        where={"$and": [{"parent": parent}, {"chunk_type": "boq"}]},
+        include=["documents", "metadatas"],
+    )
+
+    ids = result.get("ids", [])
+    documents = result.get("documents", [])
+    metadatas = result.get("metadatas", [])
+
+    return [
+        {"chunk_id": chunk_id, "document": document, "metadata": metadata}
+        for chunk_id, document, metadata in zip(ids, documents, metadatas)
+    ]
+
+
 def get_chunks_by_parent_clause(parent_clause: str):
     """Metadata-only lookup of every chunk sharing the given
     parent_clause (e.g. all children of "6.8"). Returns a list of

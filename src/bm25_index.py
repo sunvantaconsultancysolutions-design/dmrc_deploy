@@ -153,6 +153,48 @@ class BM25Index:
             for stem in stem_candidates(term):
                 self._stem_to_terms.setdefault(stem, set()).add(term)
 
+        # REGRESSION FIX (found via a deployment notebook's offline
+        # validation cell: "scope of work" stopped returning clause 2.1
+        # as its top BM25 hit after the fix above shipped).
+        #
+        # Root cause: stemming is a net win when the underlying WORD
+        # FAMILY is itself rare/specific ("rate"/"rated"/"rating" only
+        # touch 4.8% of chunks combined; "train"/"trains"/"training"
+        # only 3.5%) -- consolidating those scattered forms recovers a
+        # real signal BM25 was otherwise missing entirely (score 0.0,
+        # see the fix above). But "work"/"works"/"working" combined
+        # touch 14.7% of ALL clause chunks -- "the Works", "working
+        # hours", "work on Site" are ordinary contract vocabulary, not
+        # a specific concept. Expanding "work" -> also match "works"
+        # and "working" does not recover a missing signal here; it
+        # amplifies an already-common word into an even bigger source
+        # of noise, letting a chunk that merely uses "Works" several
+        # times as boilerplate (e.g. clause 5.3, about resident staff)
+        # outscore the one chunk that is actually ABOUT "scope of work"
+        # (clause 2.1, which uses the phrase once).
+        #
+        # Fix: only expand a query token through a stem if that stem's
+        # WHOLE family (every corpus term sharing it) appears in no
+        # more than `_MAX_STEM_FAMILY_COVERAGE` of all indexed chunks.
+        # This is a corpus-computed, non-hardcoded signal -- exactly
+        # the same "how common is this concept, really" question that
+        # already distinguishes "busbar"/"mccb" (rare, worth
+        # consolidating) from "is"/"the"/"work" (common, don't).
+        # Verified empirically: work-family=14.7%, spec-family=9.1%,
+        # rate-family=4.8%, train-family=3.5% -- 0.12 sits in the clear
+        # gap between the first two, excluding "work" while still
+        # covering every other fix this mechanism was built for.
+        self._stem_family_doc_count: dict = {}
+        for doc_tokens in tokenized_corpus:
+            doc_stems = set()
+            for tok in set(doc_tokens):
+                doc_stems |= stem_candidates(tok)
+            for stem in doc_stems:
+                self._stem_family_doc_count[stem] = self._stem_family_doc_count.get(stem, 0) + 1
+        self._corpus_size = len(tokenized_corpus)
+
+    _MAX_STEM_FAMILY_COVERAGE = 0.12
+
     def _expand_query_terms(self, tokenized_query: list) -> list:
         """Returns `tokenized_query` plus any corpus vocabulary term that
         shares a stem with one of its tokens (see class docstring above
@@ -160,11 +202,19 @@ class BM25Index:
         contribution once per document regardless of how many times it
         appears in the query token list, so adding an already-present
         term again is a harmless no-op, not a double-count.
+
+        Gated by _MAX_STEM_FAMILY_COVERAGE (see __init__ comment above):
+        a stem whose combined word-family already touches more than
+        that fraction of the corpus is skipped entirely -- for such a
+        common word, expansion adds noise rather than recovering signal.
         """
         expanded = list(tokenized_query)
         seen = set(tokenized_query)
         for tok in tokenized_query:
             for stem in stem_candidates(tok):
+                coverage = self._stem_family_doc_count.get(stem, 0) / self._corpus_size
+                if coverage > self._MAX_STEM_FAMILY_COVERAGE:
+                    continue
                 for related_term in self._stem_to_terms.get(stem, ()):
                     if related_term not in seen:
                         expanded.append(related_term)
