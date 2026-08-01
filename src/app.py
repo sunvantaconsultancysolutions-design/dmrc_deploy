@@ -987,6 +987,55 @@ def ask(request: QueryRequest) -> AnswerResponse:
         # for the two signals used and the calibration caveat.
         # ------------------------------------------------------------
         confidence_info = evaluate_confidence(reranked)
+
+        # ------------------------------------------------------------
+        # PHASE 1 AUDIT FIX -- borderline-confidence recovery.
+        #
+        # Previously, a low-confidence result short-circuited straight
+        # to NO_CONTEXT_ANSWER, and sibling expansion only ever ran
+        # AFTER confidence had already passed -- i.e. as a bonus on top
+        # of an already-good answer, never as a way to rescue a weak
+        # one. But reranker.py::expand_with_siblings()'s own docstring
+        # describes exactly the opposite failure mode: a broad question
+        # about a whole clause family can score individually-low on
+        # every member (siblings sharing almost no vocabulary with the
+        # query) even though the family AS A WHOLE is a strong match.
+        # That is precisely a "borderline confidence" situation this
+        # step is meant to catch.
+        #
+        # Fix: if the first confidence check fails and there is at
+        # least one candidate to group by parent_clause, attempt
+        # sibling expansion once, then re-evaluate confidence on the
+        # expanded list before giving up. This never fabricates
+        # anything -- expand_with_siblings() only pulls in chunks that
+        # already exist in the corpus and are cross-encoder-confirmed
+        # relevant to the same query (see relevance_margin gating in
+        # its own docstring). If the retry still isn't confident, the
+        # request still correctly reports "not found".
+        # ------------------------------------------------------------
+        already_expanded = False
+        if not confidence_info["confident"] and reranked:
+            try:
+                expanded = expand_with_siblings(query_text, reranked)
+            except Exception:
+                logger.exception(
+                    "Sibling expansion (recovery path) failed for query: %r; "
+                    "continuing without it.", query_text,
+                )
+                expanded = reranked
+
+            retry_confidence = evaluate_confidence(expanded)
+            if RAG_DEBUG:
+                logger.info(
+                    "Borderline confidence for query %r: initial=%s, after "
+                    "sibling-expansion retry=%s",
+                    query_text, confidence_info, retry_confidence,
+                )
+            if retry_confidence["confident"]:
+                reranked = expanded
+                confidence_info = retry_confidence
+                already_expanded = True
+
         if not confidence_info["confident"]:
             if RAG_DEBUG:
                 logger.info(
@@ -1012,15 +1061,21 @@ def ask(request: QueryRequest) -> AnswerResponse:
         # from. See reranker.py::expand_with_siblings() for the
         # relevance-gated expansion logic and its own docstring for why
         # this is safe.
+        #
+        # Skipped here if the borderline-confidence recovery step above
+        # already expanded this exact `reranked` list -- calling it
+        # again would be a harmless no-op (expand_with_siblings excludes
+        # chunk_ids already present) but is unnecessary work.
         # ------------------------------------------------------------
-        try:
-            reranked = expand_with_siblings(query_text, reranked)
-        except Exception:
-            # Sibling expansion is a recall *enhancement*, not a
-            # correctness requirement -- if it fails for any reason
-            # (e.g. a ChromaDB hiccup), fall back to the reranker's
-            # own output rather than failing the whole request.
-            logger.exception("Sibling expansion failed for query: %r; continuing without it.", query_text)
+        if not already_expanded:
+            try:
+                reranked = expand_with_siblings(query_text, reranked)
+            except Exception:
+                # Sibling expansion is a recall *enhancement*, not a
+                # correctness requirement -- if it fails for any reason
+                # (e.g. a ChromaDB hiccup), fall back to the reranker's
+                # own output rather than failing the whole request.
+                logger.exception("Sibling expansion failed for query: %r; continuing without it.", query_text)
 
     # QA FIX (Issue 2) -- final safety net. retrieval_caps.py now caps
     # hybrid_search(), rerank(), expand_with_siblings(), and

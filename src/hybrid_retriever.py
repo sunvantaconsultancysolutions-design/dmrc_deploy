@@ -382,6 +382,15 @@ _QUERY_SYNONYMS: dict = {
     "bms":                   ["building management system", "bms", "scada"],
     "verification and validation": ["verification", "validation", "design verification"],
     "performance requirements": ["performance requirements", "design conditions", "specifications"],
+    # Phase 1 audit additions
+    "bid value":             ["bid value", "tender value", "contract value", "total amount"],
+    "tender value":          ["tender value", "bid value", "contract value", "tender total"],
+    "worth":                 ["worth", "value", "amount", "total"],
+    "mccb":                  ["mccb", "circuit breaker", "moulded case circuit breaker"],
+    "acb":                   ["acb", "air circuit breaker", "circuit breaker"],
+    "ahu":                   ["ahu", "air handling unit", "air conditioning"],
+    "metro staff":           ["metro staff", "employer staff", "employer engineers", "employer's engineers"],
+    "employer staff":        ["employer staff", "employer engineers", "employer's engineers", "metro staff"],
 }
 
 

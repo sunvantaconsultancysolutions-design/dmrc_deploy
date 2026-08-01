@@ -201,6 +201,15 @@ _BOQ_KEYWORDS: frozenset = frozenset({
     "main plant panel", "distribution board", "sub distribution board",
     "main distribution board", "mdb", "sdb",
     "panel specification", "switchboard specification",
+    # Financial synonyms requested in Phase 1 audit: bid value / tender
+    # value are common plain-English phrasings for the same tender/contract
+    # sum already covered by "tender total"/"contract value" above.
+    "bid value", "tender value",
+    # Mechanical equipment terms (AHU/pump/chiller feeders exist in the
+    # indexed electrical BOQ as motor-feeder/starter specs; routing these
+    # to "boq" ensures the hybrid pipeline searches that corpus rather
+    # than defaulting to an unfiltered general search).
+    "ahu", "air handling unit",
     # ISSUE 5 FIX: financial BOQ / tender-summary keywords were missing
     # entirely. Terms verified against the actual corpus (data/boq_part1.json:
     # "Tender Total", "Revised Tender Total", "Discount Letter", "ECS Works",

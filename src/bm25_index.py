@@ -33,6 +33,7 @@ from typing import Optional
 from rank_bm25 import BM25Okapi
 
 from .storage import get_collection
+from .text_normalization import build_embedding_input, build_boq_embedding_input
 
 
 # ---------------------------------------------------------------------------
@@ -45,6 +46,28 @@ from .storage import get_collection
 # "6", "7", "2", "1" and losing all discriminative power. Everything else
 # (whitespace, stray punctuation) is a token boundary.
 _TOKEN_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9.\-/]*")
+
+
+def _build_bm25_text(document: str, metadata: dict) -> str:
+    """Returns the text BM25 should index for one chunk: the same
+    clause_no/heading/BOQ-item-enriched string used to build the dense
+    embedding (see main.py::_build_embedding_text), reconstructed here
+    from stored metadata rather than re-run through the embedding model.
+
+    This does not change what's stored in ChromaDB's `document` field
+    (still the bare body text, used for prompt context and the evidence
+    viewer) -- it only changes what BM25 tokenizes for its own internal
+    lexical index, which is rebuilt fresh in-memory every process start
+    and never persisted.
+    """
+    if metadata.get("chunk_type") == "boq":
+        return build_boq_embedding_input(metadata, document)
+    return build_embedding_input(
+        metadata.get("clause_no", ""),
+        metadata.get("heading", ""),
+        metadata.get("section_heading", ""),
+        document,
+    )
 
 
 def tokenize(text: str) -> list:
@@ -83,10 +106,27 @@ class BM25Index:
         self.documents = documents
         self.metadatas = metadatas
 
+        # ISSUE FIX: BM25 must index the SAME enriched text used for dense
+        # embedding (clause_no / heading / BOQ item label prepended), not
+        # the bare stored `document` text. main.py's _build_embedding_text()
+        # prepends this context before embedding (e.g. "Clause 6.7.2-4 |
+        # Penalty Clause" or "BOQ Item PART-H") but only the bare body text
+        # is persisted as ChromaDB's `document` field. Without this fix,
+        # BM25 scores a query like "Part-H", "6.7.2-4", or "Penalty Clause"
+        # as 0.0 against every chunk -- the discriminating token literally
+        # never appears in the indexed corpus -- forcing 100% reliance on
+        # dense retrieval for these lookups and defeating the whole point
+        # of having a lexical fallback. Rebuilding the same enrichment here
+        # (metadata-only, no re-embedding, no ChromaDB write) restores BM25
+        # as a genuine independent signal for exact-identifier queries.
         # One tokenized document per corpus entry, in the same order as
         # chunk_ids/documents/metadatas -- this alignment is what lets us
         # map a BM25 score at position i back to the right chunk.
-        tokenized_corpus = [tokenize(doc) for doc in documents]
+        enriched_corpus = [
+            _build_bm25_text(doc, meta)
+            for doc, meta in zip(documents, metadatas)
+        ]
+        tokenized_corpus = [tokenize(doc) for doc in enriched_corpus]
         self._bm25 = BM25Okapi(tokenized_corpus)
 
     def _matches_filter(self, metadata: dict, metadata_filter: Optional[dict]) -> bool:
