@@ -58,7 +58,7 @@ from . import retrieval_caps  # side-effect import, must run before
                                 # referenced directly below (retrieval_caps.MAX_CONTEXT)
                                 # as a final backstop before prompt construction.
 from .bm25_index import rebuild_bm25_index
-from .hybrid_retriever import hybrid_search
+from .hybrid_retriever import hybrid_search, _expand_query_for_bm25
 from .prompt_engineering import (
     NO_CONTEXT_ANSWER,
     build_prompt_with_context,
@@ -830,6 +830,15 @@ def ask(request: QueryRequest) -> AnswerResponse:
     if not query_text:
         raise HTTPException(status_code=400, detail="`query` must not be empty.")
 
+    # CALIBRATION FIX: same synonym-expanded text the BM25 leg of
+    # hybrid_search() already uses (see the rerank() call below for the
+    # full explanation). Computed unconditionally, right here, so it is
+    # always defined no matter which branch (exact-match fast path vs.
+    # hybrid_search()/rerank()) the request actually takes -- a pure
+    # string/dict lookup, not a model call, so this costs nothing even
+    # on the fast path where it ends up unused.
+    reranker_query = _expand_query_for_bm25(query_text)
+
     # ----------------------------------------------------------------
     # NEW: Exact clause-number fast path (see query.py's
     # extract_clause_no()/get_chunk_by_clause_no() docstrings for the
@@ -999,7 +1008,22 @@ def ask(request: QueryRequest) -> AnswerResponse:
         reranked = [dict(c, reranker_score=c.get("score", 1.0)) for c in candidates]
     else:
         try:
-            reranked = rerank(query_text, candidates, top_n=RERANK_TOP_N)
+            # CALIBRATION FIX (verified via scripts/calibrate_confidence.py on
+            # real reranker output): the cross-encoder was scoring genuinely
+            # on-topic candidates near zero -- e.g. "Who trains the metro
+            # staff?" scored 0.026 against the correct clause 6.9.2, which
+            # literally says "Employer's engineers and staff", because the
+            # cross-encoder only ever saw the raw query "metro staff" and had
+            # to bridge that to "Employer's engineers and staff" with zero
+            # help. hybrid_search()'s BM25 leg already solves exactly this
+            # with _expand_query_for_bm25() (same synonym dictionary that
+            # correctly maps "metro staff" -> "employer staff"/"employer
+            # engineers", "ACB" -> "air circuit breaker", etc.) -- the
+            # reranker was simply never given the same expansion. Passing it
+            # here costs nothing extra (same dictionary lookup, already
+            # computed for the BM25 leg inside hybrid_search()) and makes
+            # the two lexical/semantic signals consistent with each other.
+            reranked = rerank(reranker_query, candidates, top_n=RERANK_TOP_N)
         except Exception as exc:
             logger.error("Reranking failed for query: %r", query_text, exc_info=True)
             raise HTTPException(status_code=500, detail=f"Reranking failed: {exc}") from exc
@@ -1047,7 +1071,7 @@ def ask(request: QueryRequest) -> AnswerResponse:
         already_expanded = False
         if not confidence_info["confident"] and reranked:
             try:
-                expanded = expand_with_siblings(query_text, reranked)
+                expanded = expand_with_siblings(reranker_query, reranked)
             except Exception:
                 logger.exception(
                     "Sibling expansion (recovery path) failed for query: %r; "
@@ -1100,7 +1124,7 @@ def ask(request: QueryRequest) -> AnswerResponse:
         # ------------------------------------------------------------
         if not already_expanded:
             try:
-                reranked = expand_with_siblings(query_text, reranked)
+                reranked = expand_with_siblings(reranker_query, reranked)
             except Exception:
                 # Sibling expansion is a recall *enhancement*, not a
                 # correctness requirement -- if it fails for any reason

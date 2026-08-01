@@ -44,7 +44,7 @@ import sys
 
 sys.path.insert(0, ".")
 
-from src.hybrid_retriever import hybrid_search
+from src.hybrid_retriever import hybrid_search, _expand_query_for_bm25
 from src.reranker import (
     HIGH_CONFIDENCE_ABSOLUTE,
     MIN_ABSOLUTE_CONFIDENCE,
@@ -99,7 +99,11 @@ def run(queries, csv_path=None):
         expected = item.get("expected_clause")
 
         candidates = hybrid_search(query)
-        reranked = rerank(query, candidates)
+        # Match app.py's /ask endpoint exactly: rerank() now receives the
+        # same synonym-expanded query BM25 already used, not the raw query
+        # (see app.py's `reranker_query` for the full explanation).
+        reranker_query = _expand_query_for_bm25(query)
+        reranked = rerank(reranker_query, candidates)
         scores = sorted(
             (c["reranker_score"] for c in reranked if c.get("reranker_score") is not None),
             reverse=True,
