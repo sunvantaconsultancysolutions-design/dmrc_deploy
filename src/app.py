@@ -1213,9 +1213,27 @@ def ask(request: QueryRequest) -> AnswerResponse:
             detail=f"Gemma inference failed: {exc}",
         ) from exc
 
+    # QUALITY FIX: trim near-zero-relevance evidence cards from what the
+    # frontend displays. RERANK_TOP_N=12 always keeps up to 12 candidates
+    # for the confidence-gate/sibling-expansion logic above, but showing
+    # all 12 to the user -- including entries at 0-2% reranker_score that
+    # contributed nothing to the actual answer -- clutters the evidence
+    # panel without adding value. This only affects what's *displayed*;
+    # it runs after the confidence gate has already passed, so it never
+    # changes whether an answer is generated, only how many low-signal
+    # cards accompany it. Always keeps at least the top 5 regardless of
+    # score, so a genuinely thin answer (few relevant chunks) never loses
+    # legitimate context just because none of it scored high individually.
+    MIN_DISPLAY_SCORE = 0.02
+    MIN_SOURCES_KEPT = 5
+    sources_for_display = [
+        c for i, c in enumerate(reranked)
+        if i < MIN_SOURCES_KEPT or (c.get("reranker_score") or 0) >= MIN_DISPLAY_SCORE
+    ]
+
     return AnswerResponse(
         answer=answer,
-        sources=_build_sources(reranked, query_intent=routing_intent),
+        sources=_build_sources(sources_for_display, query_intent=routing_intent),
         # BUGFIX: was hardcoded None even though reranker_score is
         # available on every entry -- now reports the strongest score
         # actually backing this answer.

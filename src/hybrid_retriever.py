@@ -282,7 +282,7 @@ def merge_candidates(dense_results: list, sparse_results: list, final_top_k: int
 _QUERY_SYNONYMS: dict = {
     # PENALTY / DAMAGES
     "penalty":               ["penalty", "liquidated damages", "damages", "fine", "rs. 10,000"],
-    "liquidated damages":    ["liquidated damages", "penalty", "damages"],
+    "liquidated damages":    ["liquidated damages", "penalty", "penalty clause", "damages", "fine imposed", "rs per day", "maintenance period penalty"],
     "fine":                  ["penalty", "fine", "damages"],
     "compensation":          ["compensation", "liquidated damages", "penalty", "damages for delay"],
     "default":               ["default", "breach", "penalty", "liquidated damages"],
