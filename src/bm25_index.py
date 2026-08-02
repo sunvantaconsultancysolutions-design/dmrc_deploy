@@ -48,6 +48,20 @@ from .text_stem import stem_candidates
 # (whitespace, stray punctuation) is a token boundary.
 _TOKEN_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9.\-/]*")
 
+# QUALITY FIX: words excluded from BM25 SCORING only (search()'s
+# `meaningful_query`, see its docstring). Never applied to the indexed
+# corpus itself, and never used to filter what _expand_query_for_bm25()
+# or _expand_query_terms() add -- purely trims generic function words
+# and answer-type meta-language ("what is the X specification?") from
+# the literal query tokens handed to BM25Okapi.get_scores(), so a common
+# word doesn't outscore a genuinely rare, correctly-matching term.
+_SCORING_STOPWORDS = frozenset({
+    "what", "is", "are", "was", "were", "the", "a", "an",
+    "of", "in", "to", "for", "and", "or", "how", "much",
+    "does", "do", "did",
+    "specification", "specifications",
+})
+
 
 def _build_bm25_text(document: str, metadata: dict) -> str:
     """Returns the text BM25 should index for one chunk: the same
@@ -247,10 +261,40 @@ class BM25Index:
         the two result lists can be merged uniformly in hybrid_retriever.py.
         """
         tokenized_query = tokenize(query)
+
+        # QUALITY FIX: strip generic function words and answer-type
+        # meta-language ("what", "is", "specification", ...) from what
+        # gets SCORED, though they're harmless left in for display/logging.
+        #
+        # Root cause found via "What is the relay specification?": BM25
+        # sums independent per-term scores. "relay" is genuinely rare
+        # (7/375 docs, high IDF) and correctly identifies the right
+        # chunks -- but "specification" (27/375 docs) is common enough,
+        # and concentrated enough in a few unrelated clause chunks (e.g.
+        # "This Specification should be read in conjunction with..."),
+        # that its score contribution alone can outrank every actual
+        # relay chunk, even though none of them mention "specification"
+        # at all. Neither the existing plural/stem matching nor the
+        # stem-family-coverage gate on _expand_query_terms() catch this:
+        # "specification" is already a literal, un-expanded query token,
+        # and its own coverage (7.2%) sits under the family-coverage
+        # threshold used to gate expansion elsewhere.
+        #
+        # These words carry near-zero discriminating signal for THIS
+        # corpus (they describe what kind of answer is wanted -- "the
+        # X specification/rating/value" -- not which content is
+        # relevant), so removing them from scoring, while keeping every
+        # actual content word, consistently surfaces the real match
+        # without needing a query-specific rule. Falls back to the full
+        # tokenized query if stripping would leave nothing to score.
+        meaningful_query = [t for t in tokenized_query if t not in _SCORING_STOPWORDS]
+        if not meaningful_query:
+            meaningful_query = tokenized_query
+
         # PHASE 1 ROUND-2 FIX: expand with same-stem corpus terms (e.g.
         # query "rating" also looks up corpus term "rated") before
         # scoring -- see _expand_query_terms()'s docstring.
-        expanded_query = self._expand_query_terms(tokenized_query)
+        expanded_query = self._expand_query_terms(meaningful_query)
         # get_scores returns one float per corpus document, aligned by
         # index with self.chunk_ids/self.documents/self.metadatas.
         scores = self._bm25.get_scores(expanded_query)
