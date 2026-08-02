@@ -13,8 +13,8 @@ const SUGGESTION_GROUPS = [
     icon: "📄",
     label: "Contract Clauses",
     questions: [
-      "What are the contractor's obligations?",
-      "Who is responsible for maintenance during the defects liability period?",
+      "What is the penalty for delay?",
+      "What is the defects liability period?",
     ],
   },
   {
@@ -25,16 +25,12 @@ const SUGGESTION_GROUPS = [
       "Who is responsible for obtaining clearances?",
     ],
   },
-  // BUGFIX: no BOQ suggestion group previously existed even though a
-  // large share of both the corpus and the backend (get_boq_item_number,
-  // extract_boq_item_no, the BOQ chunking pipeline) is BOQ-specific --
-  // demo users had no way to discover that capability.
   {
     icon: "🧮",
-    label: "BOQ Items",
+    label: "Bill of Quantities",
     questions: [
-      "What is the quantity and rate for the excavation item?",
-      "Which BOQ item covers structural steel work?",
+      "How much is Part-H worth?",
+      "What discount was offered?",
     ],
   },
 ];
@@ -121,7 +117,7 @@ export default function App() {
       <main className="chat-scroll" ref={scrollRef}>
         {messages.length === 0 ? (
           <div className="empty-state">
-            <p className="empty-state__eyebrow">Contract Intelligence · Government &amp; PSU</p>
+            <p className="empty-state__eyebrow">Contract Intelligence</p>
             <h2>
               Ask your contract.
               <br />
