@@ -11,240 +11,286 @@
 
 DMRC Contract Intelligence is an **Enterprise Retrieval-Augmented Generation (RAG) system** for querying Delhi Metro Rail Corporation (DMRC) construction contract documents — including ECS/TVS scope-of-work text and Bill of Quantities (BOQ) items — in natural language.
 
-The system ingests clause-level and BOQ-level contract data, indexes it with hybrid dense + lexical retrieval, reranks candidates with a cross-encoder, and generates grounded, citation-aware answers using an LLM. It is designed to let contract, engineering, and legal teams ask direct questions about scope, specifications, and quantities instead of manually searching PDF documents.
+The system ingests clause-level and BOQ-level contract data, indexes it with hybrid dense + lexical retrieval, reranks candidates with a cross-encoder, gates on retrieval confidence before ever calling the LLM, and generates grounded, citation-aware answers. It is designed to let contract, engineering, and legal teams ask direct questions about scope, specifications, and quantities instead of manually searching PDF documents.
+
+**The vector store, rendered page images, and source PDFs are already built and committed — no ingestion step is required to run the app. Every chunk in the database (375/375) resolves to a real scanned page image.**
 
 ## Features
 
 - **Clause-level document chunking** — contract text is split into clause- and item-level chunks with preserved hierarchy
-- **Metadata-aware retrieval** — chunk metadata (clause number, section, document type, BOQ item fields) is used to filter and ground results
+- **Metadata-aware retrieval** — chunk metadata (clause number, section, document type, BOQ item fields) filters and grounds every result
+- **Query intent routing** — every question is classified `clause` / `boq` / `general` before retrieval
+- **Exact-match fast paths** — naming a clause number or BOQ item number verbatim skips retrieval entirely (`score=1.0`), pulling in the rest of that item's family on request
 - **Dense semantic search** — `BAAI/bge-m3` embeddings for meaning-based retrieval
-- **BM25 lexical search** — keyword-based sparse retrieval for exact-term matches
-- **Hybrid retrieval** — combines dense and BM25 results for improved recall
-- **Cross-encoder reranking** — `BAAI/bge-reranker-v2-m3` reorders candidates by relevance
-- **Prompt engineering** — structured prompt construction with retrieved context and citation instructions
-- **Answer generation** — `google/gemma-2-9b-it` (bf16) produces grounded answers from reranked context
+- **BM25 lexical search** — label-aware keyword retrieval; the index is built from the same clause-number/heading/BOQ-item-enriched text used for embedding, so identifiers like "Part-H" or "6.7.2-4" are never invisible to keyword search
+- **Scoring-stopword filtering** — generic meta-language ("what", "is", "specification") is excluded from BM25 scoring so it can't drown out a genuinely rare, correctly-matching term
+- **Hybrid retrieval** — combines dense and BM25 results for recall neither achieves alone
+- **Domain synonym expansion** — plain-English phrasing ("penalty", "who trains X", "ACB rating") is expanded toward the contract's own formal terminology before both BM25 and reranking
+- **Cross-encoder reranking** — `BAAI/bge-reranker-v2-m3` reorders candidates by relevance, scoring the same synonym-expanded query BM25 already used
+- **Confidence gating with sibling recovery** — an absolute floor plus separation-from-pool check reject weak matches before generation; a borderline result gets one retry pulling in its clause/BOQ-item family first
+- **Citation-accurate generation** — `google/gemma-2-9b-it` (bf16) copies each cited identifier verbatim from its source block's own header, whatever shape it takes (`6.8`, `PART-I`, `a)`, `iii)`)
+- **Evidence-list navigation** — the frontend viewer steps through retrieved evidence ranked by score, skipping any entry with no renderable image
 - **FastAPI backend** — serves retrieval and generation through a REST API
-- **ChromaDB vector database** — persistent local/embedded vector store
+- **ChromaDB vector database** — persistent, embedded, committed pre-built
 - **REST API** — `/ask` and `/status` endpoints for querying and health checks
-- **React frontend** — chat-style UI for submitting questions and viewing answers
-- **Docker support** — containerized backend for GPU deployment
+- **Docker, auto-built** — every push to `main` builds and publishes an image to GitHub Container Registry
 
 ## System Architecture
 
 ```
-                ┌────────────────────┐
-                │   React Frontend    │
-                │   (Vercel-hosted)   │
-                └──────────┬──────────┘
-                           │ HTTPS (CORS)
-                           ▼
-                ┌────────────────────┐
-                │   FastAPI Backend   │
-                │   (app.py, /ask)    │
-                └──────────┬──────────┘
-                           │
-        ┌──────────────────┼──────────────────┐
-        ▼                  ▼                  ▼
- ┌───────────┐     ┌───────────────┐   ┌──────────────┐
- │  BGE-M3   │     │     BM25      │   │  ChromaDB     │
- │  Dense    │     │   Lexical     │   │  Vector Store │
- │  Retrieval│     │   Retrieval   │   │               │
- └─────┬─────┘     └───────┬───────┘   └──────┬────────┘
-       └─────────┬─────────┘                  │
-                 ▼                             │
-         ┌───────────────┐                     │
-         │ Hybrid Fusion  │◄────────────────────┘
-         └───────┬────────┘
-                 ▼
-     ┌───────────────────────┐
-     │  BGE Cross-Encoder     │
-     │  Reranker (v2-m3)      │
-     └───────────┬────────────┘
-                 ▼
-     ┌───────────────────────┐
-     │  Prompt Construction   │
-     └───────────┬────────────┘
-                 ▼
-     ┌───────────────────────┐
-     │  Gemma-2-9B-it (bf16)  │
-     │  Answer Generation     │
-     └───────────┬────────────┘
-                 ▼
-           Final Answer
+                +--------------------+
+                |   React Frontend    |
+                +----------+----------+
+                           | HTTPS (CORS)
+                           v
+                +--------------------+
+                |   FastAPI Backend   |
+                |   (app.py, /ask)    |
+                +----------+----------+
+                           v
+                +--------------------+
+                |   Query Router      |
+                | clause / boq /      |
+                | general             |
+                +----------+----------+
+                           v
+        +------------------+------------------+
+        v                  v                  v
+ +-----------+     +---------------+   +--------------+
+ |  BGE-M3   |     |     BM25      |   |  ChromaDB     |
+ |  Dense    |     |   Lexical     |   |  Vector Store |
+ |  Retrieval|     |  (label-aware,|   |               |
+ |           |     |   stopword-   |   |               |
+ |           |     |   filtered)   |   |               |
+ +-----+-----+     +-------+-------+   +------+--------+
+       +-----------+---------+                |
+                 v                            |
+         +---------------+                    |
+         | Hybrid Fusion  |<-------------------+
+         +-------+--------+
+                 v
+     +-----------------------+
+     |  BGE Cross-Encoder     |
+     |  Reranker (v2-m3)      |
+     |  same expanded query   |
+     +-----------+------------+
+                 v
+     +-----------------------+
+     |  Confidence Gate        |
+     |  + sibling/family retry  |
+     +-----------+------------+
+                 v
+     +-----------------------+
+     |  Prompt Construction   |
+     |  (citation rules)       |
+     +-----------+------------+
+                 v
+     +-----------------------+
+     |  Gemma-2-9B-it (bf16)  |
+     |  Answer Generation     |
+     +-----------+------------+
+                 v
+     Cited Answer + Evidence Page
 ```
 
 ## Project Structure
 
 ```
-dmrc-contract-intelligence/
-├── README.md
-├── requirements.txt
-├── Dockerfile
-├── data/                        # Parsed contract JSON (clause + BOQ chunks)
-├── chroma_db/                   # Persistent vector store
-├── src/
-│   ├── app.py                   # FastAPI application, CORS, /ask, /status
-│   ├── text_normalization.py    # Normalization, embedding-input builder
-│   ├── metadata_loader.py       # Metadata schema mapping (clause + BOQ)
-│   ├── embed_single.py          # Single-chunk BGE-M3 encoding
-│   ├── batch_embed.py           # Batched BGE-M3 encoding
-│   ├── storage.py               # ChromaDB persistence
-│   ├── retrieval.py             # Dense + BM25 hybrid retrieval
-│   ├── retrieval_caps.py        # Retrieval limits / candidate caps
-│   ├── reranker.py              # Cross-encoder reranking
-│   ├── prompt_builder.py        # Prompt construction
-│   └── generation.py            # Gemma-2-9B-it inference
-├── frontend/                    # React + Vite chat UI
-│   ├── src/
-│   └── README.md
-└── main.py                      # Embedding pipeline entry point
+dmrc_deploy/
+|-- README.md
+|-- requirements.txt
+|-- Dockerfile
+|-- main.py                        # Ingestion entrypoint (data/*.json -> chroma_db/)
+|-- patch_ch3_pdf_page.py          # One-time metadata patch (already applied)
+|-- patch_addendum_images.py       # One-time metadata patch (already applied)
+|-- data/                          # Transcribed clause + BOQ source JSON
+|-- chroma_db/                     # Pre-built, committed vector store
+|-- page_images/                   # Rendered scanned pages, one folder per document_id
+|-- source_pdfs/                   # Original contract PDFs (6 files)
+|-- scripts/                       # Maintenance/diagnostic utilities
+|-- docs/                          # Metadata schema reference
+|-- src/
+|   |-- app.py                     # FastAPI app: /ask, /status, /pages, /figures
+|   |-- query_router.py            # clause / boq / general classification
+|   |-- query.py                   # Exact clause/BOQ-item fast paths + family lookups
+|   |-- hybrid_retriever.py        # BM25 + dense fusion, synonym query expansion
+|   |-- bm25_index.py              # In-memory BM25, label-aware, stopword-filtered
+|   |-- reranker.py                # Cross-encoder reranking, confidence gate, sibling expansion
+|   |-- prompt_engineering.py      # Prompt assembly, citation rules, token budgeting
+|   |-- gemma_inference.py         # Gemma-2-9B-it load + generation
+|   |-- storage.py                 # ChromaDB collection accessor
+|   |-- metadata_loader.py         # Parses data/*.json into embeddable chunk records
+|   |-- text_normalization.py      # Enriched text builder shared by embedding/BM25/reranking
+|   |-- text_stem.py               # Lightweight stemmer shared by the router and BM25
+|   |-- retrieval_caps.py          # Hard ceilings on candidate/context list sizes
+|   `-- validate_db.py             # Standalone ChromaDB consistency checker
+`-- frontend/                      # React + Vite chat UI and evidence viewer
+    `-- src/
 ```
 
 ## Technology Stack
 
 | Layer | Technology |
 |---|---|
-| Language | Python |
+| Language | Python 3.10/3.11 |
 | Backend API | FastAPI |
 | Vector database | ChromaDB |
-| Embedding model | BAAI/bge-m3 (Hugging Face Transformers) |
-| Reranker | BAAI/bge-reranker-v2-m3 |
-| Generation model | google/gemma-2-9b-it |
+| Embedding model | `BAAI/bge-m3` |
+| Reranker | `BAAI/bge-reranker-v2-m3` |
+| Generation model | `google/gemma-2-9b-it` (bf16) |
 | Frontend | React (Vite) |
-| Containerization | Docker |
-| Development/validation | Google Colab (A100 GPU) |
-
-## Data Pipeline
-
-```
-JSON Documents (clause + BOQ chunks)
-        │
-        ▼
-Metadata Extraction (metadata_loader.py)
-        │
-        ▼
-Text Normalization (text_normalization.py)
-        │
-        ▼
-Clause / BOQ Chunking
-        │
-        ▼
-Embedding Generation (BAAI/bge-m3)
-        │
-        ▼
-ChromaDB Storage
-```
+| Containerization | Docker, auto-built via GitHub Actions → GHCR |
+| Development GPU | NVIDIA A100 (Colab / RunPod) |
 
 ## Retrieval Pipeline
 
 ```
 User Query
-        │
-        ▼
-Dense Retrieval (BGE-M3, ChromaDB)
-        │
-        ▼
-BM25 Retrieval (lexical)
-        │
-        ▼
-Hybrid Search (fusion of both result sets)
-        │
-        ▼
-Cross-Encoder Reranking (BGE-reranker-v2-m3)
-        │
-        ▼
-Prompt Engineering (context + citation instructions)
-        │
-        ▼
+        |
+        v
+Exact-match fast path? (clause/BOQ item number named verbatim)
+        | no
+        v
+Query Router (clause / boq / general)
+        |
+        v
+Hybrid Search: BM25 (synonym-expanded, label-aware, stopword-filtered) + BGE-M3 Dense
+        |
+        v
+Cross-Encoder Reranking (same expanded query as BM25)
+        |
+        v
+Confidence Gate (absolute floor + separation check; sibling/family retry on borderline)
+        |
+        v
+Prompt Construction (context + verbatim citation rules)
+        |
+        v
 Gemma-2-9B-it Inference
-        │
-        ▼
-Final Answer
+        |
+        v
+Cited Answer + Evidence Page
 ```
 
 ## Installation
 
 ```bash
-# 1. Clone the repository
-git clone <repository-url>
-cd dmrc-contract-intelligence
+git clone https://github.com/sunvantaconsultancysolutions-design/dmrc_deploy
+cd dmrc_deploy
 
-# 2. Create and activate a virtual environment
-python -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 
-# 3. Install backend dependencies
 pip install -r requirements.txt
-
-# 4. Install frontend dependencies
-cd frontend
-npm install
-cd ..
+cd frontend && npm install && cd ..
 ```
 
-The first run downloads `BAAI/bge-m3`, `BAAI/bge-reranker-v2-m3`, and `google/gemma-2-9b-it` from Hugging Face. `google/gemma-2-9b-it` is a **gated** model — accept its license at https://huggingface.co/google/gemma-2-9b-it and set `HF_TOKEN` before running.
+`google/gemma-2-9b-it` is a **gated** model — accept its license at
+https://huggingface.co/google/gemma-2-9b-it, then set `HF_TOKEN` before
+running the server.
 
 ## Running the Project
 
-**1. Run the embedding pipeline** (populates ChromaDB):
+The vector store is already built, so you can start the server directly:
 
 ```bash
-python main.py --input-dir data/
-```
-
-**2. Start the FastAPI server:**
-
-```bash
+export HF_TOKEN=hf_xxxxxxxxxxxx   # Windows: set HF_TOKEN=hf_xxxxxxxxxxxx
 uvicorn src.app:app --host 0.0.0.0 --port 8000
 ```
 
-**3. Query the system:**
+First start downloads ~20 GB of model weights (10-20 minutes). Check readiness:
+
+```bash
+curl http://127.0.0.1:8000/status
+```
+
+Query it:
 
 ```bash
 curl -X POST http://localhost:8000/ask \
   -H "Content-Type: application/json" \
-  -d '{"query": "What is the scope of work under Clause 5 of the ECS contract?"}'
+  -d '{"query": "What is the penalty for delay?"}'
 ```
 
-**4. Run the frontend:**
+Run the frontend:
 
 ```bash
 cd frontend
+echo "VITE_API_URL=http://127.0.0.1:8000" > .env
 npm run dev
 ```
+
+## Running via Docker
+
+**Option A — pull the image GitHub already built:**
+
+```bash
+docker pull ghcr.io/sunvantaconsultancysolutions-design/dmrc_deploy:latest
+
+docker run --gpus all -p 8000:8000 \
+  -e HF_TOKEN=hf_xxxxxxxxxxxx \
+  -v /path/to/persistent/models:/models \
+  ghcr.io/sunvantaconsultancysolutions-design/dmrc_deploy:latest
+```
+
+**Option B — build directly from GitHub, no clone needed:**
+
+```bash
+docker build -t dmrc-backend https://github.com/sunvantaconsultancysolutions-design/dmrc_deploy.git
+docker run --gpus all -p 8000:8000 -e HF_TOKEN=hf_xxxxxxxxxxxx dmrc-backend
+```
+
+The container's healthcheck allows up to 25 minutes for cold model loading.
 
 ## API Endpoints
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/ask` | Submit a natural-language query and receive a generated, context-grounded answer |
-| `GET` | `/status` | Health check — reports ChromaDB connection and model load status (`dense_model_loaded`, `reranker_model_loaded`, `gemma_model_loaded`) |
+| `GET` | `/` | Basic health check |
+| `GET` | `/status` | Model/DB readiness (`dense_model_loaded`, `reranker_model_loaded`, `gemma_model_loaded`, `chromadb_connected`) |
+| `POST` | `/ask` | `{"query": "..."}` → cited answer + source list |
+| `GET` | `/pages/manifest` | Available scanned page images |
+| `GET` | `/figures/manifest` | Available extracted figures |
+| `GET` | `/pages/{document_id}/{page}.jpg` | Static scanned page image |
+
+## Key Environment Variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `HF_TOKEN` | *(required)* | HF token with Gemma license accepted |
+| `GEMMA_USE_4BIT` | `0` | Set `1` on lower-VRAM GPUs |
+| `RAG_MAX_CANDIDATES` / `RAG_MAX_CONTEXT` | `60` / `20` | Retrieval breadth ceilings |
+| `RAG_MIN_CONFIDENCE` / `RAG_MIN_SEPARATION` | `0.10` / `0.08` | Confidence gate thresholds |
+| `ALLOWED_ORIGINS` | `*` (dev) | CORS allow-list — set explicitly in production |
+| `RAG_DEBUG` | unset | Set `1` for verbose retrieval/confidence logging |
+
+## Re-running Ingestion
+
+Only needed when adding a new source document:
+
+```bash
+python main.py --input data/your_new_file.json
+python scripts/render_pages.py --pdf-dir source_pdfs
+python scripts/migrate_page_image_dirs.py
+```
+
+## Diagnostics
+
+`scripts/calibrate_confidence.py` replays queries through the real retrieval + reranking pipeline (requires GPU/model access) and reports the actual confidence-gate decision and score for each — useful for investigating a query that returns "not found" despite the underlying data existing:
+
+```bash
+python scripts/calibrate_confidence.py --queries my_queries.jsonl --csv results.csv
+```
+
+## Known Data-Coverage Limitations
+
+- Civil works (excavation, earthwork, foundations) exist only as a single financial total (Part-G); no line-item detail was transcribed.
+- Transformers, generators, batteries, and several other equipment types are not mentioned anywhere in the indexed corpus.
+- A handful of BOQ sub-item "rating" fragments can still weakly rank against a generic disclaimer chunk — not fixed, since doing so the same way as "specification" would have broken the already-working ACB/busbar rating queries.
 
 ## Future Improvements
 
-- Support for additional DMRC contract lots and document types
+- Transcribe remaining civil works and mechanical equipment line items
 - User authentication and role-based access control
 - Conversation history / multi-turn context
-- Answer confidence scoring surfaced in the UI
-- Support for alternative vector stores (e.g., Qdrant)
-- Automated evaluation suite for retrieval and answer quality
-
-## Author
-
-**Name:** _[Your Name]_
-**Organization:** _[Your Organization]_
-**Contact:** _[Your Email]_
-**GitHub:** _[Your GitHub Profile]_
-
----
-
-## Summary of Changes from Previous README
-
-- Reframed the document from a single "Chapter 7 — Embedding Generation Module" write-up into a full, standalone Enterprise RAG platform README covering the entire system (retrieval, reranking, generation, API, frontend).
-- Removed all references to chapters, notebooks-as-source-of-truth, and development history; the system is now presented as a complete, production-ready application.
-- Added dedicated **Features**, **System Architecture**, **Data Pipeline**, **Retrieval Pipeline**, and **API Endpoints** sections that were not previously documented in one place.
-- Documented the full retrieval stack (dense + BM25 + hybrid + cross-encoder reranking) and generation stage (Gemma-2-9B-it), which were previously only implied via the Colab notebooks and deployment notes.
-- Replaced the single-module folder structure with a project-wide structure reflecting `src/` (retrieval, reranking, prompt building, generation), `frontend/`, and `Dockerfile` at the project root.
-- Consolidated installation and running instructions into one flow covering both backend and frontend, and both the embedding pipeline and the API server.
-- Added a placeholder **Author** section and GitHub-style badges for a professional presentation.
-- Removed Colab/RunPod/Vercel deployment mechanics and internal migration notes (kept only the technologies actually used) to keep the README focused and concise.
+- Automated regression suite run in CI on every push
