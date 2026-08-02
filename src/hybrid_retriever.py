@@ -324,8 +324,8 @@ _QUERY_SYNONYMS: dict = {
     "operation manual":      ["operation manual", "maintenance manual", "documentation"],
     "maintenance manual":    ["maintenance manual", "operation manual", "documentation"],
     # SPARE PARTS
-    "spare parts":           ["spare parts", "spares", "tools and test equipment"],
-    "spares":                ["spares", "spare parts", "tools and test equipment"],
+    "spare parts":           ["spare parts", "spares", "special tools"],
+    "spares":                ["spares", "spare parts", "special tools"],
     "spares list":           ["spares list", "spare parts", "schedule of spares"],
     "long lead time":        ["long lead time", "spare parts", "lead times"],
     "shelf life":            ["shelf life", "storage requirement", "spare parts"],
